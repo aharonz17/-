@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>סורק ברקודים</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #b9d6f2, #d4e5f7);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-container {
+            margin-bottom: 2rem;
+            width: 300px;
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 10px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+            padding: 10px;
+            overflow: hidden;
+        }
+
+        .logo-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+        }
+
+        .container {
+            background: rgba(255, 255, 255, 0.98);
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+            width: 90%;
+            max-width: 600px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #456;
+            margin-bottom: 2rem;
+            font-weight: 600;
+        }
+
+        .scanner-container {
+            background: #fafbfc;
+            padding: 2rem;
+            border-radius: 10px;
+            margin: 2rem 0;
+            border: 2px dashed #b9d6f2;
+        }
+
+        #barcodeInput {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid #e1e8f0;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            text-align: center;
+            direction: ltr;
+            transition: all 0.3s ease;
+        }
+
+        #barcodeInput:focus {
+            outline: none;
+            border-color: #b9d6f2;
+            box-shadow: 0 0 0 3px rgba(185, 214, 242, 0.2);
+        }
+
+        .status {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            display: none;
+            transition: all 0.3s ease;
+        }
+
+        .success {
+            background-color: #e8f5e9;
+            color: #1b5e20;
+            border: 1px solid #c8e6c9;
+        }
+
+        .error {
+            background-color: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fee2e2;
+        }
+
+        @keyframes scan {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 100% 50%; }
+        }
+
+        .scanning {
+            background: linear-gradient(90deg, #fafbfc 0%, #f1f5f9 50%, #fafbfc 100%);
+            background-size: 200% 100%;
+            animation: scan 1.5s infinite;
+        }
+
+        .waiting {
+            border-color: #ffd700 !important;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.4);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 3px solid #b9d6f2;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 15px;
+            text-align: center;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        }
+
+        .close-modal {
+            color: #aaa;
+            position: absolute;
+            top: -30px;
+            right: 0;
+            font-size: 36px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .close-modal:hover {
+            color: black;
+        }
+
+        .response-lines {
+            text-align: right;
+            margin-top: 15px;
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #f1f6fc;
+            padding: 15px;
+            border-radius: 12px;
+            font-size: 36px;
+            border: 3px solid #b9d6f2;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        #modalMessage {
+            font-size: 36px;
+            font-weight: bold;
+            text-align: center;
+            margin: 15px 0;
+            padding: 10px;
+            border-radius: 10px;
+            border: 3px solid #b9d6f2;
+            background-color: #f1f6fc;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .clickable-link {
+            color: #0066cc;
+            text-decoration: underline;
+            cursor: pointer;
+            word-break: break-all;
+        }
+
+        .clickable-link:hover {
+            color: #004080;
+        }
+
+        .error-cross {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            transform: rotate(45deg);
+            display: none;
+            top: 50%;
+            left: 50%;
+            margin-top: -50px;
+            margin-left: -50px;
+        }
+        .error-cross::before, .error-cross::after {
+            content: '';
+            position: absolute;
+            background-color: red;
+        }
+        .error-cross::before {
+            left: 50%;
+            width: 10px;
+            margin-left: -5px;
+            top: 0;
+            bottom: 0;
+        }
+        .error-cross::after {
+            top: 50%;
+            height: 10px;
+            margin-top: -5px;
+            left: 0;
+            right: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="logo-container">
+        <img src="https://i.ibb.co/8cB0mNp/image.png" alt="Logo" class="logo-image" onerror="this.style.display='none'">
+    </div>
+
+    <div class="container">
+        
+        
+        <div class="scanner-container" id="scannerContainer">
+            <input type="text" id="barcodeInput" placeholder="סרוק ברקוד כאן" autocomplete="off">
+            <div id="status" class="status"></div>
+            <div id="errorCross" class="error-cross"></div>
+        </div>
+    </div>
+
+    <div id="responseModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" id="closeModal">&times;</span>
+            <h2 id="modalTitle">תוצאת הסריקה</h2>
+            <p id="modalMessage"></p>
+            <div id="responseLines" class="response-lines"></div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const input = document.getElementById('barcodeInput');
+            const status = document.getElementById('status');
+            const scannerContainer = document.getElementById('scannerContainer');
+            const responseModal = document.getElementById('responseModal');
+            const modalMessage = document.getElementById('modalMessage');
+            const responseLines = document.getElementById('responseLines');
+            const closeModal = document.getElementById('closeModal');
+            const errorCross = document.getElementById('errorCross');
+            const speechSynthesis = window.speechSynthesis;
+            let isProcessing = false;
+            let inputTimeout = null;
+            const WAIT_TIME = 100;
+
+            function convertUrlsToLinks(text) {
+                const urlRegex = /(https?:\/\/[^\s]+)/g;
+                return text.replace(urlRegex, function(url) {
+                    return `<a href="${url}" target="_blank" class="clickable-link">לפרטים נוספים לחץ כאן</a>`;
+                });
+            }
+
+            input.focus();
+
+            function speakText(text) {
+                speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'he-IL';
+                utterance.pitch = 1.2;
+                utterance.rate = 0.8;
+                utterance.volume = 1;
+                
+                const voices = speechSynthesis.getVoices();
+                const hebrewVoices = voices.filter(voice => voice.lang === 'he-IL');
+                if (hebrewVoices.length > 0) {
+                    utterance.voice = hebrewVoices[0];
+                }
+                
+                speechSynthesis.speak(utterance);
+            }
+
+            function showModal(message, lines, type, statusCode) {
+                responseLines.innerHTML = '';
+
+                lines.slice(0, -1).forEach(line => {
+                    const lineElement = document.createElement('div');
+                    lineElement.innerHTML = convertUrlsToLinks(line);
+                    lineElement.style.fontSize = '36px';
+                    responseLines.appendChild(lineElement);
+                });
+
+                if (statusCode === 200) {
+                    modalMessage.style.backgroundColor = '#e8f5e9';
+                    errorCross.style.display = 'none';
+                } else if (statusCode === 400) {
+                    errorCross.style.display = 'block';
+                    modalMessage.style.backgroundColor = '#fef2f2';
+                }
+
+                modalMessage.innerHTML = convertUrlsToLinks(message);
+                modalMessage.className = type;
+                modalMessage.style.fontSize = '36px';
+                responseModal.style.display = 'flex';
+
+                speakText(lines[lines.length - 1]);
+
+                setTimeout(() => {
+                    responseModal.style.display = 'none';
+                }, 3000);
+            }
+
+            closeModal.onclick = function() {
+                responseModal.style.display = 'none';
+            }
+
+            window.onclick = function(event) {
+                if (event.target == responseModal) {
+                    responseModal.style.display = 'none';
+                }
+            }
+
+            async function processBarcode(barcode) {
+                if (isProcessing) return;
+                
+                isProcessing = true;
+                scannerContainer.classList.add('scanning');
+                input.classList.remove('waiting');
+
+                try {
+                    const response = await fetch('https://hook.us2.make.com/w3alokpqs2oab0p75h32ufqs9y23ijwh?gender=נכנס לפני הזמן', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ barcode })
+                    });
+
+                    const result = await response.text();
+                    const lines = result.split('\n');
+
+                    if (response.ok) {
+                        const successMessage = 'הברקוד נסרק בהצלחה: ' + barcode;
+                        showStatus(result, 'success');
+                        showModal(lines[lines.length - 1], lines, 'success', response.status);
+                    } else {
+                        const errorMessage = 'שגיאה בסריקה: ' + result;
+                        showStatus(errorMessage, 'error');
+                        showModal(lines[lines.length - 1], lines, 'error', response.status);
+                    }
+                } catch (error) {
+                    const errorMessage = 'שגיאה בתקשורת עם השרת: ' + error.message;
+                    showStatus(errorMessage, 'error');
+                    showModal(error.message, [error.message], 'error', 500);
+                }
+
+                setTimeout(() => {
+                    input.value = '';
+                    scannerContainer.classList.remove('scanning');
+                    isProcessing = false;
+                    input.focus();
+                }, 1000);
+            }
+
+            input.addEventListener('input', function(e) {
+                input.classList.add('waiting');
+                
+                if (inputTimeout) {
+                    clearTimeout(inputTimeout);
+                }
+
+                inputTimeout = setTimeout(() => {
+                    const barcode = e.target.value;
+                    if (barcode.length > 0) {
+                        processBarcode(barcode);
+                    }
+                }, WAIT_TIME);
+            });
+
+            document.addEventListener('click', function() {
+                input.focus();
+            });
+
+            function showStatus(message, type) {
+                status.textContent = message;
+                status.className = `status ${type}`;
+                status.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
