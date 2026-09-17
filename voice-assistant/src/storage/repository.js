@@ -141,11 +141,61 @@ export function markReminderCompleted (reminderId) {
     `).run(STATUS.COMPLETED, timestamp(), reminderId);
 }
 
+/**
+ * דחיית תזכורת.
+ *
+ * attempts מתאפס בכוונה: המשתמש ביקש במפורש שיזכירו לו שוב, ולכן זו
+ * תזכורת חדשה לעניין מכסת הניסיונות. בלי האיפוס, דחייה מתוך תיבת
+ * ההמתנה הייתה נחשבת כמיצוי המכסה וחוזרת מיד ל-WAITING בלי לחייג.
+ */
 export function snoozeReminder (reminderId, until) {
     const stored = toStorage(until);
     getDb().prepare(`
-        UPDATE reminders SET status = ?, due_at = ?, snoozed_to = ? WHERE reminder_id = ?
+        UPDATE reminders
+        SET status = ?, due_at = ?, snoozed_to = ?, attempts = 0
+        WHERE reminder_id = ?
     `).run(STATUS.SNOOZED, stored.iso, stored.iso, reminderId);
+}
+
+/**
+ * תזמון מחדש של ניסיון חוזר ביוזמת המערכת.
+ *
+ * בניגוד ל-snoozeReminder, כאן attempts *נשמר* — זה אותו ניסיון להשיג
+ * את המשתמש, לא בקשה חדשה שלו. שתי הפעולות נראות דומות ולכן מופרדות
+ * במפורש: ערבוב ביניהן יוצר לולאת חיוג אינסופית.
+ */
+export function rescheduleReminderForRetry (reminderId, at) {
+    const stored = toStorage(at);
+    getDb().prepare(`
+        UPDATE reminders SET status = ?, due_at = ? WHERE reminder_id = ?
+    `).run(STATUS.SNOOZED, stored.iso, reminderId);
+}
+
+/**
+ * תזכורת שחויגה ולא אושרה. היא לא נמחקת ולא נסגרת — היא עוברת לתיבת
+ * ההמתנה ותושמע בשיחה הנכנסת הבאה.
+ */
+export function markReminderWaiting (reminderId) {
+    getDb().prepare('UPDATE reminders SET status = ? WHERE reminder_id = ?')
+        .run(STATUS.WAITING, reminderId);
+}
+
+/**
+ * התזכורות הממתינות, מהוותיקה לחדשה.
+ *
+ * ה-JOIN מביא את נתיב ההקלטה המקורית באותה שאילתה, כדי שהשמעה חוזרת
+ * (הקשה 9) לא תדרוש שאילתה נוספת לכל תזכורת בתוך שיחה פעילה.
+ */
+export function findWaitingReminders ({ limit = 20 } = {}) {
+    return getDb().prepare(`
+        SELECT r.*, rec.yemot_path, rec.drive_link
+        FROM reminders r
+        JOIN entries    e   ON e.entry_id      = r.entry_id
+        JOIN recordings rec ON rec.recording_id = e.recording_id
+        WHERE r.status = ?
+        ORDER BY r.due_at ASC
+        LIMIT ?
+    `).all(STATUS.WAITING, limit);
 }
 
 export function markReminderNoAnswer (reminderId) {

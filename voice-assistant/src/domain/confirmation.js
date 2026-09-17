@@ -64,3 +64,36 @@ export function reminderCallScript (text, snoozeShortMinutes, snoozeLongMinutes)
         menu: `אם ביצעת הקש 1, לעוד ${snoozeShortMinutes} דקות הקש 2, ${longLabel} הקש 3`
     };
 }
+
+/**
+ * הטקסט של תזכורת ממתינה, כפי שהיא מושמעת בתיבה בתחילת שיחה נכנסת.
+ *
+ * @param {string} text מה להזכיר
+ * @param {string} ageText "מאתמול" וכדומה
+ * @param {boolean} allowReplay האם להציע השמעה של ההקלטה המקורית
+ */
+export function pendingReminderScript (text, ageText, { snoozeShortMinutes, snoozeLongMinutes, allowReplay }) {
+    const longLabel = snoozeLongMinutes === 60
+        ? 'לעוד שעה'
+        : `לעוד ${snoozeLongMinutes} דקות`;
+
+    const options = [
+        'אם ביצעת הקש 1',
+        `לעוד ${snoozeShortMinutes} דקות הקש 2`,
+        `${longLabel} הקש 3`
+    ];
+
+    if (allowReplay) {
+        options.push('לשמוע את ההקלטה המקורית הקש 9');
+    }
+
+    return {
+        body: `תזכורת ${ageText}: ${sanitizeForSpeech(text)}`,
+        menu: options.join(', ')
+    };
+}
+
+/** ההודעה שנשמעת כשממתינות כמה תזכורות, לפני שמשמיעים אותן. */
+export function inboxOfferScript (count) {
+    return `יש לך ${count} תזכורות שממתינות, לשמוע אותן הקש 1, לדלג הקש 2`;
+}

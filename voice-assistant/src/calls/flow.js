@@ -17,9 +17,12 @@
 import { EVENTS } from '../logging/events.js';
 import { logger } from '../logging/logger.js';
 import { config } from '../config/index.js';
-import { say, sayAll } from '../domain/speech.js';
-import { confirmReminder, confirmNote, askForMissing, CONFIRM_MENU } from '../domain/confirmation.js';
-import { resolveReminderTime, now } from '../domain/time.js';
+import { say, sayAll, playFile, safeRecordingName } from '../domain/speech.js';
+import {
+    confirmReminder, confirmNote, askForMissing, CONFIRM_MENU,
+    pendingReminderScript, inboxOfferScript
+} from '../domain/confirmation.js';
+import { resolveReminderTime, now, fromStorage, describeAge } from '../domain/time.js';
 import { STATUS } from '../storage/db.js';
 import * as repo from '../storage/repository.js';
 
@@ -60,7 +63,9 @@ export function createCallFlow ({ ai, yemotApi, archive, mirrors }) {
 
         const yemotPath = await call.read(sayAll(prompt), 'record', {
             path: config.yemot.recordingsPath,
-            file_name: `${call.callId}-${attempt}`,
+            // ספרות בלבד: השם הזה מושמע חזרה בתיבת התזכורות, וימות
+            // פוסלת מקף בהשמעה. ראה safeRecordingName.
+            file_name: safeRecordingName(attempt),
             no_confirm_menu: true,   // תפריט האישור של ימות מיותר: יש לנו אישור משלנו
             save_on_hangup: true,    // ניתוק באמצע לא ימחק את מה שכבר נאמר
             min_length: config.recording.minSeconds,
@@ -213,6 +218,113 @@ export function createCallFlow ({ ai, yemotApi, archive, mirrors }) {
         return { entry, reminder };
     }
 
+    /**
+     * תיבת התזכורות הממתינות.
+     *
+     * תזכורת שחויגה ולא אושרה לא נעלמת — היא ממתינה כאן. בתחילת כל שיחה
+     * נכנסת, לפני הברכה, המשתמש שומע מה ממתין לו.
+     *
+     * זה גם מה שהופך את מערכת התזכורות לעמידה: היא רצה על המסלול הנכנס,
+     * שאומת, ולא תלויה בחיוג היוצא שטרם אומת מול ימות.
+     */
+    async function playPendingReminders (call, log) {
+        const waiting = repo.findWaitingReminders();
+        if (waiting.length === 0) return;
+
+        // כשממתינות כמה, שואלים קודם. מי שהתקשר כדי להשאיר פתק מהיר
+        // לא צריך לעבור שבע תזכורות בדרך.
+        if (waiting.length >= config.reminders.inboxAskThreshold) {
+            log.event(EVENTS.REMINDER_INBOX_OFFERED, { count: waiting.length });
+
+            const choice = await call.read(
+                sayAll(inboxOfferScript(waiting.length)),
+                'tap',
+                { max_digits: 1, digits_allowed: [1, 2], sec_wait: 8 }
+            );
+
+            if (choice !== '1') {
+                log.event(EVENTS.REMINDER_INBOX_SKIPPED, { count: waiting.length });
+                return;
+            }
+        }
+
+        for (const reminder of waiting) {
+            await offerReminder(call, log, reminder);
+        }
+    }
+
+    /** תזכורת בודדת: משמיע, ומטפל בהקשה. */
+    async function offerReminder (call, log, reminder) {
+        const reminderLog = log.child({ reminderId: reminder.reminder_id });
+        const ageText = describeAge(fromStorage(reminder.due_at), now());
+
+        // שני סיבובים לכל היותר: הראשון עם אפשרות השמעה חוזרת,
+        // והשני אחריה. בלי התקרה הזו הקשה 9 חוזרת יוצרת לולאה.
+        let allowReplay = Boolean(reminder.yemot_path);
+
+        for (let round = 0; round < 2; round += 1) {
+            const script = pendingReminderScript(reminder.text, ageText, {
+                snoozeShortMinutes: config.reminders.snoozeShortMinutes,
+                snoozeLongMinutes: config.reminders.snoozeLongMinutes,
+                allowReplay
+            });
+
+            const choice = await call.read(
+                sayAll(script.body, script.menu),
+                'tap',
+                {
+                    max_digits: 1,
+                    digits_allowed: allowReplay ? [1, 2, 3, 9] : [1, 2, 3],
+                    sec_wait: 10
+                }
+            );
+
+            if (choice === '1') {
+                repo.markReminderCompleted(reminder.reminder_id);
+                reminderLog.event(EVENTS.REMINDER_COMPLETED, { via: 'inbox' });
+                return;
+            }
+
+            if (choice === '2' || choice === '3') {
+                const minutes = choice === '2'
+                    ? config.reminders.snoozeShortMinutes
+                    : config.reminders.snoozeLongMinutes;
+
+                const until = now().plus({ minutes });
+                repo.snoozeReminder(reminder.reminder_id, until);
+                reminderLog.event(EVENTS.REMINDER_SNOOZED, {
+                    via: 'inbox', minutes, until: until.toISO()
+                });
+                return;
+            }
+
+            if (choice === '9' && allowReplay) {
+                try {
+                    // ההקלטה המקורית בקולו של המשתמש. עוקפת לגמרי שגיאת
+                    // תמלול: גם אם השם תומלל לא נכון, הוא שומע את עצמו.
+                    call.id_list_message([playFile(reminder.yemot_path)], { prependToNextAction: true });
+                    reminderLog.event(EVENTS.REMINDER_REPLAYED_ORIGINAL, {
+                        yemotPath: reminder.yemot_path
+                    });
+                } catch (error) {
+                    reminderLog.failure({
+                        message: 'כשל בהשמעת ההקלטה המקורית',
+                        yemotPath: reminder.yemot_path,
+                        error
+                    });
+                    call.id_list_message(sayAll('לא הצלחתי להשמיע את ההקלטה'), { prependToNextAction: true });
+                }
+
+                allowReplay = false;
+                continue;
+            }
+
+            // לא הוקש כלום, או הוקש משהו לא צפוי: התזכורת נשארת ממתינה
+            // ותושמע שוב בשיחה הבאה. זו התנהגות מכוונת ולא כישלון.
+            break;
+        }
+    }
+
     return async function handleCall (call) {
         const log = logger.child({ callId: call.callId, phone: call.phone });
 
@@ -222,6 +334,14 @@ export function createCallFlow ({ ai, yemotApi, archive, mirrors }) {
             log.event(EVENTS.CALL_REJECTED_UNAUTHORIZED, {});
             call.id_list_message(sayAll(UNAUTHORIZED));
             return;
+        }
+
+        // לפני הברכה: מה שממתין לך. כישלון כאן לא חוסם את השיחה —
+        // המשתמש התקשר כדי לומר משהו, והתזכורות יחכו לפעם הבאה.
+        try {
+            await playPendingReminders(call, log);
+        } catch (error) {
+            log.failure({ message: 'כשל בהשמעת תזכורות ממתינות', stage: 'inbox', error });
         }
 
         for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
