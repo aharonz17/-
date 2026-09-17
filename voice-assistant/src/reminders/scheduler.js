@@ -1,17 +1,24 @@
 /**
- * תזכורות ושיחות חוזרות — שלב D.
+ * תזכורות ושיחות חוזרות.
  *
- * ⚠ מצב הרכיב: הקוד כאן מלא ואמיתי, אבל מסלול החיוג היוצא **לא אומת
- *   מול ימות** (אפיון, דרישה 2 ודרישה 28). שתי שאלות פתוחות:
+ * מודל ההתנהגות: **חיוג אחד, ואז המתנה.**
  *
- *     1. כיצד מעבירים שיחת קמפיין לשלוחת API כדי לקלוט הקשות 1/2/3.
- *     2. מה עלות החיוג היוצא בפועל — היא משפיעה על מדיניות הניסיונות
- *        החוזרים (סעיף 17: 3 ניסיונות = פי 3 עלות לכל תזכורת שפוספסה).
+ * תזכורת שהגיע זמנה מחייגת פעם אחת. אם המשתמש לא אישר אותה — מכל סיבה,
+ * בין אם לא ענה, לא שמע או ניתק — היא עוברת לסטטוס WAITING ו**נשארת**.
+ * בשיחה הנכנסת הבאה היא תושמע לו (src/calls/flow.js, תיבת התזכורות).
  *
- *   לכן החיוג היוצא כבוי כברירת מחדל ונדרשת הפעלה מפורשת ב-
- *   REMINDERS_OUTBOUND_ENABLED=true. כשהוא כבוי, התזכורות עדיין נוצרות,
- *   מתוזמנות ומדווחות בלוג — פשוט לא מחייגות. זה מכוון: עדיף רכיב
- *   שמצהיר שהוא לא מאומת מאשר רכיב שמתנהג כאילו הוא כן.
+ * העיקרון שמחזיק את זה: **לא מנסים לזהות אם המשתמש ענה.**
+ * תזכורת נסגרת רק כשהוקש 1. כל מצב אחר משאיר אותה ממתינה.
+ * זיהוי מענה היה מחייב קריאת סטטוס קמפיין בימות — בדיוק החלק שלא אומת —
+ * והכלל הזה עובד נכון בלעדיו. הוא גם נכשל לצד הבטוח: הסיכון הוא שתזכורת
+ * תושמע פעמיים, לא שתיעלם.
+ *
+ * ⚠ מסלול החיוג היוצא **לא אומת מול ימות** (אפיון, דרישה 2 ודרישה 28):
+ *   נותר לברר כיצד מעבירים שיחת קמפיין לשלוחת API לקליטת הקשות, ומה
+ *   עלות החיוג. לכן הוא כבוי כברירת מחדל ודורש
+ *   REMINDERS_OUTBOUND_ENABLED=true. כשהוא כבוי התזכורות עדיין נוצרות,
+ *   מתוזמנות, נרשמות בלוג ועוברות ל-WAITING — כלומר **תיבת התזכורות
+ *   עובדת גם בלי חיוג יוצא כלל.** זו הסיבה שהיא נבנתה על המסלול הנכנס.
  *
  * מנגנון התזמון: סריקה תקופתית של הטבלה, לא טיימר בזיכרון.
  * דרישה 18 מחייבת תזכורות אמינות, וטיימר בזיכרון נמחק עם המופע —
@@ -73,13 +80,13 @@ export function createReminderScheduler ({ yemotApi }) {
     return {
         /**
          * סורק תזכורות שהגיע זמנן ומחייג.
-         * @returns {Promise<{due: number, called: number, skipped: number, exhausted: number}>}
+         * @returns {Promise<{due: number, called: number, skipped: number, waiting: number}>}
          */
         async tick () {
             const due = repo.findDueReminders(now());
             let called = 0;
             let skipped = 0;
-            let exhausted = 0;
+            let waiting = 0;
 
             for (const reminder of due) {
                 const log = logger.child({
@@ -87,13 +94,15 @@ export function createReminderScheduler ({ yemotApi }) {
                     callId: reminder.call_id
                 });
 
+                // הגנה על רשומות שנוצרו במדיניות ישנה: תזכורת שכבר מיצתה
+                // את מכסת הניסיונות עוברת להמתנה, לא נסגרת.
                 if (attemptsExhausted(reminder)) {
-                    repo.markReminderNoAnswer(reminder.reminder_id);
-                    log.event(EVENTS.REMINDER_CALL_NO_ANSWER, {
+                    repo.markReminderWaiting(reminder.reminder_id);
+                    log.event(EVENTS.REMINDER_WAITING, {
                         attempts: reminder.attempts,
-                        finalStatus: 'NO_ANSWER'
+                        reason: 'מכסת הניסיונות מוצתה'
                     });
-                    exhausted += 1;
+                    waiting += 1;
                     continue;
                 }
 
@@ -110,17 +119,27 @@ export function createReminderScheduler ({ yemotApi }) {
                         attempt: reminder.attempts + 1,
                         dueAt: reminder.due_at
                     });
-
-                    // אין מענה מיידי: התזכורת נדחית למועד הניסיון הבא.
-                    // אם המשתמש יענה ויקיש 1, השיחה תסמן אותה COMPLETED
-                    // והיא לא תישלף שוב בסריקה הבאה.
-                    const delayMinutes = nextRetryDelayMinutes(reminder);
-                    repo.snoozeReminder(
-                        reminder.reminder_id,
-                        now().plus({ minutes: delayMinutes })
-                    );
-
                     called += 1;
+
+                    // אם המשתמש ענה והקיש 1, השיחה כבר סימנה COMPLETED
+                    // והעדכון כאן לא יחזיר אותה לתור — findWaitingReminders
+                    // ו-findDueReminders שניהם מסננים לפי סטטוס.
+                    if (reminder.attempts + 1 >= config.reminders.retryCount) {
+                        repo.markReminderWaiting(reminder.reminder_id);
+                        log.event(EVENTS.REMINDER_WAITING, {
+                            attempts: reminder.attempts + 1,
+                            reason: 'חויג ולא אושר, ממתין לשיחה נכנסת'
+                        });
+                        waiting += 1;
+                    } else {
+                        // מדיניות של יותר מניסיון אחד: תזמון חוזר ששומר
+                        // על attempts. חובה שלא להשתמש כאן ב-snoozeReminder,
+                        // שמאפס אותו ויוצר לולאת חיוג.
+                        repo.rescheduleReminderForRetry(
+                            reminder.reminder_id,
+                            now().plus({ minutes: nextRetryDelayMinutes(reminder) })
+                        );
+                    }
                 } catch (error) {
                     log.failure({
                         message: 'כשל בחיוג תזכורת',
@@ -131,7 +150,7 @@ export function createReminderScheduler ({ yemotApi }) {
                 }
             }
 
-            return { due: due.length, called, skipped, exhausted };
+            return { due: due.length, called, skipped, waiting };
         },
 
         /** מקש 1 בשיחה החוזרת. */

@@ -21,6 +21,10 @@ export const STATUS = Object.freeze({
     COMPLETED: 'COMPLETED',
     CANCELLED: 'CANCELLED',
     SNOOZED: 'SNOOZED',
+    // תזכורת שחויגה ולא אושרה. היא לא נעלמת — היא ממתינה להשמעה
+    // בשיחה הנכנסת הבאה. ראה src/reminders/scheduler.js
+    WAITING: 'WAITING',
+    // נשמר לתאימות עם רשומות ישנות; אינו בשימוש בזרימה הנוכחית
     NO_ANSWER: 'NO_ANSWER',
     ERROR: 'ERROR'
 });

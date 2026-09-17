@@ -155,10 +155,15 @@ export const config = Object.freeze({
     responseBudgetMs: integer('RESPONSE_BUDGET_MS', 3000),
 
     reminders: Object.freeze({
-        retryCount: integer('REMINDER_RETRY_COUNT', 3),
+        // ברירת מחדל: חיוג אחד. תזכורת שלא אושרה לא הולכת לאיבוד —
+        // היא עוברת ל-WAITING ומושמעת בשיחה הנכנסת הבאה.
+        retryCount: integer('REMINDER_RETRY_COUNT', 1),
         retryDelaysMinutes: integerList('REMINDER_RETRY_DELAYS_MINUTES', [5, 15]),
         snoozeShortMinutes: integer('SNOOZE_SHORT_MINUTES', 10),
-        snoozeLongMinutes: integer('SNOOZE_LONG_MINUTES', 60)
+        snoozeLongMinutes: integer('SNOOZE_LONG_MINUTES', 60),
+        // מכמה תזכורות ממתינות ואילך נשאל קודם אם לשמוע אותן,
+        // במקום להשמיע ישר. תזכורת בודדת תמיד מושמעת ישר.
+        inboxAskThreshold: integer('REMINDER_INBOX_ASK_THRESHOLD', 2)
     }),
 
     databasePath: resolve(projectRoot, optional('DATABASE_PATH', './data/assistant.sqlite'))

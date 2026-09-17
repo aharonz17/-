@@ -182,3 +182,23 @@ export function fromStorage (iso) {
 }
 
 export { ZONE as TIMEZONE };
+
+/**
+ * ניסוח גיל התזכורת להשמעה: "מהיום", "מאתמול", "מלפני 3 ימים".
+ *
+ * תזכורת שממתינה כבר כמה ימים צריכה להישמע ישנה — אחרת המשתמש לא מבדיל
+ * בין תזכורת שחויגה לפני חמש דקות לבין אחת ששכח משבוע שעבר.
+ */
+export function describeAge (at, reference = now()) {
+    const daysAgo = Math.round(reference.startOf('day').diff(at.startOf('day'), 'days').days);
+
+    if (daysAgo <= 0) return 'מהיום';
+    if (daysAgo === 1) return 'מאתמול';
+    if (daysAgo === 2) return 'משלשום';
+    if (daysAgo < 7) return `מלפני ${daysAgo} ימים`;
+    if (daysAgo < 14) return 'מלפני שבוע';
+
+    const weeks = Math.floor(daysAgo / 7);
+    if (daysAgo < 30) return `מלפני ${weeks} שבועות`;
+    return `מלפני ${at.day} ב${hebrewMonth(at)}`;
+}
