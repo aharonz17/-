@@ -54,8 +54,10 @@ async function main () {
     } else {
         const yemot = createYemotApi();
         await check('טוקן תקף', async () => {
-            await yemot.verifyToken();
-            return 'החיבור ל-call2all תקין';
+            const result = await yemot.verifyToken();
+            return result.hasSessionToken
+                ? 'ההזדהות התקבלה והתקבל טוקן סשן'
+                : 'ההזדהות התקבלה';
         });
     }
 
