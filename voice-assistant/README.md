@@ -149,10 +149,22 @@ node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
 ```bash
 gcloud projects create <PROJECT_ID>
 gcloud config set project <PROJECT_ID>
-gcloud services enable drive.googleapis.com sheets.googleapis.com \
-                       docs.googleapis.com speech.googleapis.com
 
-gcloud iam service-accounts create voice-assistant
+gcloud services enable \
+    run.googleapis.com cloudbuild.googleapis.com secretmanager.googleapis.com \
+    drive.googleapis.com sheets.googleapis.com docs.googleapis.com \
+    speech.googleapis.com
+
+gcloud iam service-accounts create voice-assistant --display-name="Voice Assistant"
+```
+
+**הכתובת שנוצרה היא `voice-assistant@<PROJECT_ID>.iam.gserviceaccount.com`.**
+זו הזהות שאיתה משתפים את קבצי ה-Drive בשלב הבא, ושאיתה רץ השירות
+ב-Cloud Run. שתי הנקודות האלה חייבות להיות אותה כתובת.
+
+לפיתוח מקומי בלבד נדרש גם קובץ מפתח:
+
+```bash
 gcloud iam service-accounts keys create service-account.json \
     --iam-account=voice-assistant@<PROJECT_ID>.iam.gserviceaccount.com
 ```
@@ -235,17 +247,42 @@ npm run benchmark
 
 ## Deployment ל-Cloud Run
 
+קודם יוצרים את הסודות ונותנים לחשבון השירות גישה אליהם:
+
+```bash
+printf %s "<YEMOT_TOKEN>"   | gcloud secrets create yemot-token    --data-file=-
+printf %s "<WEBHOOK_SECRET>" | gcloud secrets create webhook-secret --data-file=-
+printf %s "<GEMINI_API_KEY>" | gcloud secrets create gemini-key     --data-file=-
+
+for S in yemot-token webhook-secret gemini-key; do
+  gcloud secrets add-iam-policy-binding $S \
+    --member="serviceAccount:voice-assistant@<PROJECT_ID>.iam.gserviceaccount.com" \
+    --role="roles/secretmanager.secretAccessor"
+done
+```
+
+ואז ה-deploy:
+
 ```bash
 gcloud run deploy voice-assistant \
   --source . \
   --region me-west1 \
   --allow-unauthenticated \
-  --set-env-vars "TIMEZONE=Asia/Jerusalem,NODE_ENV=production" \
-  --set-secrets "YEMOT_TOKEN=yemot-token:latest,WEBHOOK_SECRET=webhook-secret:latest,GEMINI_API_KEY=gemini-key:latest"
+  --service-account voice-assistant@<PROJECT_ID>.iam.gserviceaccount.com \
+  --set-env-vars "NODE_ENV=production,TIMEZONE=Asia/Jerusalem" \
+  --set-env-vars "GOOGLE_PROJECT_ID=<PROJECT_ID>,AUTHORIZED_PHONE=<המספר שלך>" \
+  --set-env-vars "GOOGLE_DRIVE_FOLDER_ID=<מזהה>,GOOGLE_DOCS_FOLDER_ID=<מזהה>,GOOGLE_SHEET_ID=<מזהה>" \
+  --set-secrets "YEMOT_TOKEN=yemot-token:latest" \
+  --set-secrets "WEBHOOK_SECRET=webhook-secret:latest" \
+  --set-secrets "GEMINI_API_KEY=gemini-key:latest"
 ```
 
 `--allow-unauthenticated` נחוץ כדי שימות תוכל לפנות לשרת.
 ההגנה היא הסוד המשותף בכתובת, לא IAM.
+
+**`--service-account` אינו אופציונלי.** בלעדיו Cloud Run רץ עם חשבון
+ברירת המחדל של המחשוב, שאיתו לא שיתפת את תיקיות ה-Drive — והתסמין יהיה
+`404 File not found` על כל שמירה, בזמן שההרשאות *נראות* תקינות.
 
 ### שתי אזהרות שחשוב להבין
 
@@ -258,6 +295,7 @@ gcloud run deploy voice-assistant \
 
 ```bash
 gcloud scheduler jobs create http flush-mirrors \
+  --location me-west1 \
   --schedule "* * * * *" \
   --uri "https://<הדומיין>/tasks/flush-mirrors?secret=<WEBHOOK_SECRET>" \
   --http-method POST
