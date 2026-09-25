@@ -16,6 +16,20 @@ import { createDocsWriter } from '../src/storage/docs.js';
 import { createProvider } from '../src/ai/index.js';
 import { now } from '../src/domain/time.js';
 
+/**
+ * קובץ WAV מינימלי ותקין: כותרת בלבד, 8 קילוהרץ, בלי דגימות.
+ * מספיק כדי לאמת מפתח, הרשאות ותקשורת — בלי לשרוף מכסה על אודיו אמיתי.
+ */
+function silentWav () {
+    const header = Buffer.alloc(44);
+    header.write('RIFF', 0); header.writeUInt32LE(36, 4); header.write('WAVE', 8);
+    header.write('fmt ', 12); header.writeUInt32LE(16, 16); header.writeUInt16LE(1, 20);
+    header.writeUInt16LE(1, 22); header.writeUInt32LE(8000, 24); header.writeUInt32LE(16000, 28);
+    header.writeUInt16LE(2, 32); header.writeUInt16LE(16, 34);
+    header.write('data', 36); header.writeUInt32LE(0, 40);
+    return header;
+}
+
 const results = [];
 
 async function check (name, fn, { required = true } = {}) {
@@ -67,19 +81,25 @@ async function main () {
     } else {
         await check(`Gemini (${config.google.geminiModel})`, async () => {
             const provider = createProvider('gemini');
-            // קובץ WAV מינימלי ותקין: כותרת בלבד, בלי דגימות.
-            // מספיק כדי לאמת מפתח, הרשאות ותקשורת — בלי לשרוף מכסה.
-            const header = Buffer.alloc(44);
-            header.write('RIFF', 0); header.writeUInt32LE(36, 4); header.write('WAVE', 8);
-            header.write('fmt ', 12); header.writeUInt32LE(16, 16); header.writeUInt16LE(1, 20);
-            header.writeUInt16LE(1, 22); header.writeUInt32LE(8000, 24); header.writeUInt32LE(16000, 28);
-            header.writeUInt16LE(2, 32); header.writeUInt16LE(16, 34);
-            header.write('data', 36); header.writeUInt32LE(0, 40);
-
-            await provider.understand({ audio: header, mimeType: 'audio/wav', timeoutMs: 30000 });
+            await provider.understand({ audio: silentWav(), mimeType: 'audio/wav', timeoutMs: 30000 });
             return 'המודל עונה';
         });
     }
+
+    console.log('\nמנועי תמלול להשוואה');
+    if (!config.stt.groqApiKey) skip('Groq', 'GROQ_API_KEY חסר');
+    else await check(`Groq (${config.stt.groqModel})`, async () => {
+        const provider = createProvider('groq');
+        await provider.transcribeOnly({ audio: silentWav(), mimeType: 'audio/wav', timeoutMs: 30000 });
+        return 'המנוע עונה';
+    });
+
+    if (!config.stt.elevenLabsApiKey) skip('ElevenLabs', 'ELEVENLABS_API_KEY חסר');
+    else await check(`ElevenLabs (${config.stt.elevenLabsModel})`, async () => {
+        const provider = createProvider('elevenlabs');
+        await provider.transcribeOnly({ audio: silentWav(), mimeType: 'audio/wav', timeoutMs: 45000 });
+        return 'המנוע עונה — benchmark בלבד';
+    });
 
     console.log('\nGoogle');
     if (!config.google.driveFolderId) skip('Drive', 'GOOGLE_DRIVE_FOLDER_ID חסר');
