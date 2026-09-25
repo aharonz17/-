@@ -12,10 +12,14 @@
 import { config } from '../config/index.js';
 import { createGeminiProvider } from './gemini.js';
 import { createGoogleSttProvider } from '../stt/google-stt.js';
+import { createGroqProvider } from '../stt/groq.js';
+import { createElevenLabsProvider } from '../stt/elevenlabs.js';
 
 const FACTORIES = {
     gemini: createGeminiProvider,
-    'google-stt': createGoogleSttProvider
+    'google-stt': createGoogleSttProvider,
+    groq: createGroqProvider,
+    elevenlabs: createElevenLabsProvider
 };
 
 export function createProvider (name, options = {}) {
@@ -32,8 +36,9 @@ export function createActiveUnderstandingProvider () {
 
     if (typeof provider.understand !== 'function') {
         throw new Error(
-            `ACTIVE_TRANSCRIBER="${config.activeTranscriber}" הוא מנוע תמלול בלבד ואינו מבין כוונה. ` +
-            'לשיחה חיה נדרש מנוע עם understand, למשל gemini.'
+            `ACTIVE_TRANSCRIBER="${config.activeTranscriber}" הוא מנוע תמלול בלבד ואינו מבין כוונה.\n` +
+            'לשיחה חיה נדרש מנוע שמחזיר בקריאה אחת תמלול, כוונה ותשובה — כרגע gemini בלבד.\n' +
+            'המנועים האחרים קיימים להשוואה ב-npm run benchmark.'
         );
     }
     return provider;

@@ -110,7 +110,10 @@ function normalizePhone (phone) {
 }
 
 const transcriber = optional('ACTIVE_TRANSCRIBER', 'gemini');
-if (!['gemini', 'google-stt'].includes(transcriber)) {
+// מנועים שמותר להגדיר כמנוע השיחה. מנוע מתמלל בלבד שמוגדר כאן
+// ייעצר בעלייה עם הסבר, ב-createActiveUnderstandingProvider.
+const LIVE_CAPABLE = ['gemini', 'google-stt', 'groq'];
+if (!LIVE_CAPABLE.includes(transcriber)) {
     warnings.push(`ACTIVE_TRANSCRIBER="${transcriber}" אינו מוכר — נעשה שימוש ב-gemini`);
 }
 
@@ -145,7 +148,19 @@ export const config = Object.freeze({
     }),
 
     timezone: optional('TIMEZONE', 'Asia/Jerusalem'),
-    activeTranscriber: ['gemini', 'google-stt'].includes(transcriber) ? transcriber : 'gemini',
+    activeTranscriber: LIVE_CAPABLE.includes(transcriber) ? transcriber : 'gemini',
+
+    /**
+     * מנועי תמלול נוספים, להשוואה ב-benchmark.
+     * ElevenLabs הוא ל-benchmark בלבד — המכסה החינמית שלו אינה כוללת
+     * רישיון מסחרי. ראה src/stt/elevenlabs.js
+     */
+    stt: Object.freeze({
+        groqApiKey: optional('GROQ_API_KEY'),
+        groqModel: optional('GROQ_MODEL', 'whisper-large-v3-turbo'),
+        elevenLabsApiKey: optional('ELEVENLABS_API_KEY'),
+        elevenLabsModel: optional('ELEVENLABS_MODEL', 'scribe_v1')
+    }),
 
     recording: Object.freeze({
         maxSeconds: integer('MAX_RECORDING_SECONDS', 60),
