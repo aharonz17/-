@@ -1,0 +1,10 @@
+node_modules
+data
+.env
+*.local
+benchmark/recordings
+benchmark/results
+service-account*.json
+credentials*.json
+tests
+*.log

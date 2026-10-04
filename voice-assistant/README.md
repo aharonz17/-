@@ -1,0 +1,362 @@
+# עוזר קולי אישי בטלפון
+
+מתקשרים למספר ימות המשיח, מדברים, והמערכת מקליטה, מתמללת, מבינה,
+מקריאה חזרה מה הבינה, ורק אחרי אישור — שומרת.
+
+> **לפני הכול: קרא את [STATUS.md](./STATUS.md).**
+> הוא מפרט מה נבדק בפועל ומה עדיין לא. הקוד כאן מלא ואמיתי,
+> אבל הוא **מעולם לא רץ מול ימות המשיח**, כי סביבת הפיתוח שבה נכתב
+> חוסמת את `call2all.co.il`.
+
+---
+
+## איך זה עובד
+
+```
+        המשתמש מתקשר
+              ↓
+        ימות המשיח  ──── שלוחת API ────→  השרת הזה
+              ↑                                │
+              │                                ├─ מוריד את ההקלטה מימות
+              │                                ├─ שומר אותה מיד (דיסק + תור ל-Drive)
+              │                                ├─ שולח ל-Gemini
+              │                                └─ מקבל תמלול + כוונה + משפט טבעי
+              │                                │
+              └──── "הבנתי: מחר ב-10:00, ←─────┤
+                     להזכיר לך להתקשר ליוסי.    │
+                     לאישור הקש 1"              │
+                                                ↓
+                                    1 → נשמר ב-SQLite
+                                        → תור ל-Sheets ול-Docs
+                                    2 → הקלטה מחדש
+```
+
+### תזכורות: חיוג אחד, ואז המתנה
+
+תזכורת שהגיע זמנה **מחייגת פעם אחת**. אם לא אישרת אותה — לא ענית, לא
+שמעת, ניתקת — היא **לא נעלמת**. היא עוברת להמתנה, ובשיחה הנכנסת הבאה
+היא הדבר הראשון שתשמע:
+
+```
+"תזכורת מאתמול: להתקשר למשה.
+ אם ביצעת הקש 1, לעוד 10 דקות הקש 2, לעוד שעה הקש 3,
+ לשמוע את ההקלטה המקורית הקש 9"
+```
+
+**הקשה 9 משמיעה אותך.** ההקלטה המקורית שמורה בימות, וההשמעה חינם.
+זה עוקף לגמרי שגיאות תמלול: גם אם המערכת כתבה "יוסף" במקום "יוסי",
+אתה שומע את עצמך ויודע בדיוק למה התכוונת.
+
+כשממתינות כמה תזכורות, המערכת שואלת קודם — כדי שלא תיתקע בשבע תזכורות
+כשרצית רק להשאיר פתק מהיר. תזכורת בודדת מושמעת ישר.
+
+**העיקרון שמחזיק את זה: לא מנסים לזהות אם ענית.** תזכורת נסגרת רק
+כשהקשת 1. כל מצב אחר משאיר אותה ממתינה. הכלל הזה לא תלוי ביכולת לקרוא
+סטטוס שיחה מימות, והוא נכשל לצד הבטוח — הסיכון הוא לשמוע תזכורת פעמיים,
+לא לאבד אותה.
+
+**בונוס:** התיבה רצה כולה על המסלול הנכנס. גם אם החיוג היוצא לא יאומת
+מול ימות, יש כאן מערכת תזכורות עובדת — פשוט צריך להתקשר.
+
+### מנועי התמלול
+
+| מנוע | תפקיד | חינם |
+|---|---|---|
+| **Gemini** | המנוע החי. קריאה אחת מחזירה תמלול, כוונה ומשפט טבעי | 1,500 בקשות/יום |
+| **Groq** (Whisper large-v3-turbo) | השוואה | 8 שעות אודיו/יום |
+| **ElevenLabs Scribe** | השוואה בלבד — הרישיון החינמי אוסר שימוש מסחרי | ~30 דק'/חודש |
+| **Google STT** | השוואה | 60 דק'/חודש |
+
+**רק Gemini יכול לרוץ בשיחה חיה.** השאר מתמללים בלבד, וידרשו שלב שני של
+מודל — שני round trips בתוך שיחת טלפון, שנשמעים למתקשר כשתיקה.
+
+**איך בוחרים:** לא לפי הטבלה. `npm run benchmark` מודד אותם על ההקלטות
+שלך. שום מדד שפורסם אינו רלוונטי כאן — FLEURS ו-Common Voice הם הקלטות
+אולפן נקיות, והאודיו שלנו הוא 8 קילוהרץ מקו טלפון.
+
+```bash
+npm run benchmark -- --engines gemini,groq,elevenlabs
+```
+
+### שני סוגי טוקנים
+
+לימות יש טוקן **ישיר** (`<מספר>:<סיסמה>`, קבוע) וטוקן **סשן** (מ-`Login`, זמני).
+נמצא בפועל שחלק מה-endpoints דוחים את הישיר עם `session token is invalid`.
+
+`src/voice/yemot-api.js` **לא מכריע בשאלה**: הוא שולח את הישיר, ורק אם
+נדחה כשגיאת אימות מתחבר פעם אחת ומנסה שוב. שגיאה שאינה אימות לא מפעילה
+התחברות, ואין ניסיון חוזר שני — כדי שסיסמה שגויה לא תהפוך ללולאה.
+
+אתה מגדיר רק את `YEMOT_TOKEN`. השאר קורה לבד.
+
+### שלוש החלטות שכדאי להכיר לפני שנוגעים בקוד
+
+**1. האודיו נשמר לפני התמלול.**
+`src/calls/flow.js` שומר את ההקלטה ברגע שהיא מגיעה, לפני שהיא נשלחת לאן שהוא.
+אם Gemini נופל, אם Google נופל, אם המשתמש ביקש להקליט מחדש — ההודעה לא אבדה.
+
+**2. משפט האישור לא מגיע מהמודל.**
+המודל מחזיר שדה `reply` לשיחה טבעית. את המשפט שמתאר *מה עומד להישמר*
+בונה `src/domain/confirmation.js` מתוך שדות שעברו validation.
+בלי ההפרדה הזו, מודל שהוזה יכול להקריא "קבעתי לך תזכורת" כשכלום לא נשמר.
+
+**3. חשבון הזמן נעשה בקוד, לא במודל.**
+המודל מדווח מה שמע (`"+30m"`, `"10:00"`). `src/domain/time.js` מחשב
+ב-`Asia/Jerusalem` עם luxon. מודלים טועים בחשבון "מחרתיים בערב".
+
+---
+
+## מבנה
+
+```
+src/
+├── config/      טעינת הגדרות ואימות בעלייה
+├── logging/     לוגר מובנה + אוצר מילות האירועים של סעיף 26
+├── domain/      סכימה, חשבון זמן, ניסוח אישור, ניקוי טקסט ל-TTS
+├── ai/          ממשק ההבנה + מימוש Gemini
+├── stt/         מימוש Google STT (להשוואה ב-benchmark)
+├── voice/       לקוח ה-REST של ימות
+├── calls/       זרימת השיחה
+├── storage/     SQLite, Drive, Sheets, Docs, תור התצוגה
+├── reminders/   תזמון ושיחות חוזרות
+├── benchmark/   מדדי איכות תמלול
+└── http/        שרת ונתיבים
+
+bin/
+├── check-config.js    בדיקת חיבור אמיתית לכל שירות
+├── benchmark.js       השוואת מנועי תמלול
+└── flush-mirrors.js   ריקון ידני של תור התצוגה
+```
+
+---
+
+## התקנה
+
+```bash
+npm install
+cp .env.example .env
+```
+
+### יצירת סוד ה-webhook
+
+```bash
+node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
+```
+
+הערך נכנס ל-`WEBHOOK_SECRET`, ואותו ערך נוסף לכתובת שמוגדרת בימות.
+בלעדיו כל מי שמגלה את הכתובת יכול לזייף שיחות.
+
+### משתני סביבה
+
+הרשימה המלאה עם הסברים נמצאת ב-[.env.example](./.env.example).
+החובה שבהם:
+
+| משתנה | מה זה |
+|---|---|
+| `WEBHOOK_SECRET` | הסוד המשותף עם ימות |
+| `YEMOT_TOKEN` | `<מספר-מערכת>:<סיסמת-הניהול>` — אותה סיסמה שבה נכנסים לפאנל |
+| `AUTHORIZED_PHONE` | המספר היחיד שמורשה להשתמש במערכת |
+| `GEMINI_API_KEY` | מ-https://aistudio.google.com/apikey |
+
+**אף סוד לא נכנס ל-git.** `.env` ו-`service-account.json` ב-`.gitignore`.
+
+---
+
+## הגדרת Google
+
+### 1. פרויקט ו-Service Account
+
+```bash
+gcloud projects create <PROJECT_ID>
+gcloud config set project <PROJECT_ID>
+
+gcloud services enable \
+    run.googleapis.com cloudbuild.googleapis.com secretmanager.googleapis.com \
+    drive.googleapis.com sheets.googleapis.com docs.googleapis.com \
+    speech.googleapis.com
+
+gcloud iam service-accounts create voice-assistant --display-name="Voice Assistant"
+```
+
+**הכתובת שנוצרה היא `voice-assistant@<PROJECT_ID>.iam.gserviceaccount.com`.**
+זו הזהות שאיתה משתפים את קבצי ה-Drive בשלב הבא, ושאיתה רץ השירות
+ב-Cloud Run. שתי הנקודות האלה חייבות להיות אותה כתובת.
+
+לפיתוח מקומי בלבד נדרש גם קובץ מפתח:
+
+```bash
+gcloud iam service-accounts keys create service-account.json \
+    --iam-account=voice-assistant@<PROJECT_ID>.iam.gserviceaccount.com
+```
+
+ב-Cloud Run עדיף לוותר על קובץ המפתח ולהשתמש בזהות המופע
+(Application Default Credentials) — אז אין קובץ מפתח בכלל.
+פשוט השאר את `GOOGLE_APPLICATION_CREDENTIALS` ריק.
+
+### 2. Drive, Sheets ו-Docs
+
+צור ידנית ב-Drive:
+
+- תיקייה **העוזר הקולי** → המזהה מה-URL נכנס ל-`GOOGLE_DRIVE_FOLDER_ID`
+- תיקייה **מסמכים** → `GOOGLE_DOCS_FOLDER_ID`
+- גיליון חדש → `GOOGLE_SHEET_ID`
+
+**שתף את שלושתם עם כתובת המייל של ה-service account, עם הרשאת עריכה.**
+זה השלב שהכי קל לשכוח, והתסמין שלו הוא `404 File not found`.
+
+תת-התיקיות (`הקלטות/2026/09`) ומסמך החודש נוצרים אוטומטית.
+
+### 3. Gemini
+
+מפתח מ-https://aistudio.google.com/apikey → `GEMINI_API_KEY`.
+ה-free tier הוא 1,500 בקשות ליום, ושיחה אחת היא בקשה אחת.
+
+---
+
+## הגדרת ימות המשיח
+
+בשלוחה שבה תתקבלנה השיחות:
+
+```ini
+type=api
+api_link=https://<הדומיין-שלך>/yemot?secret=<WEBHOOK_SECRET>
+```
+
+ודא שהנתיב ב-`YEMOT_RECORDINGS_PATH` קיים במערכת ושיש לו הרשאת כתיבה.
+ברירת המחדל היא `/1`. **הנתיב חייב להתחיל ב-`/` ואסור שיסתיים ב-`/`** —
+זה אילוץ של ימות, לא של הקוד.
+
+---
+
+## הרצה
+
+```bash
+npm run check-config   # בודק חיבור אמיתי לכל שירות
+npm start              # מריץ את השרת
+npm test               # 47 בדיקות
+```
+
+`check-config` מדווח בשלוש קטגוריות — עובד, לא עובד, לא נבדק —
+ולא מסתיר כישלון מאחורי ברירת מחדל.
+
+---
+
+## שלב 0 — מדידת איכות התמלול
+
+**זה השלב שקובע אם למוצר יש בסיס.** אודיו טלפוני הוא 8 קילוהרץ צר,
+ותוצאות ממיקרופון של מחשב יהיו אופטימיות ולא ישקפו את המציאות.
+
+1. הקלט **30–50 הודעות דרך שיחת טלפון אמיתית** (דרישה 5 באפיון).
+   הכלל: רגיל, מהיר, שמות אנשים, שמות עסקים, מספרים, תאריכים, שעות,
+   "בעוד שעה", "מחר בבוקר", ניסוחים לא פורמליים.
+2. שים אותן ב-`benchmark/recordings/`.
+3. צור `benchmark/ground-truth.json` לפי
+   [`benchmark/ground-truth.example.json`](./benchmark/ground-truth.example.json).
+4. הרץ:
+
+```bash
+npm run benchmark
+```
+
+הפלט משווה את המנועים על WER, דיוק סמנטי, דיוק שעה, דיוק תאריך והשהיה.
+
+**המדד הקובע הוא הסמנטי, לא WER.** מילה שתומללה מעט שונה אינה שגיאה.
+שעה שהובנה 10:00 במקום 22:00 — כן. זה בדיוק מה שסעיף 24 באפיון אומר.
+
+---
+
+## Deployment ל-Cloud Run
+
+קודם יוצרים את הסודות ונותנים לחשבון השירות גישה אליהם:
+
+```bash
+printf %s "<YEMOT_TOKEN>"   | gcloud secrets create yemot-token    --data-file=-
+printf %s "<WEBHOOK_SECRET>" | gcloud secrets create webhook-secret --data-file=-
+printf %s "<GEMINI_API_KEY>" | gcloud secrets create gemini-key     --data-file=-
+
+for S in yemot-token webhook-secret gemini-key; do
+  gcloud secrets add-iam-policy-binding $S \
+    --member="serviceAccount:voice-assistant@<PROJECT_ID>.iam.gserviceaccount.com" \
+    --role="roles/secretmanager.secretAccessor"
+done
+```
+
+ואז ה-deploy:
+
+```bash
+gcloud run deploy voice-assistant \
+  --source . \
+  --region me-west1 \
+  --allow-unauthenticated \
+  --service-account voice-assistant@<PROJECT_ID>.iam.gserviceaccount.com \
+  --set-env-vars "NODE_ENV=production,TIMEZONE=Asia/Jerusalem" \
+  --set-env-vars "GOOGLE_PROJECT_ID=<PROJECT_ID>,AUTHORIZED_PHONE=<המספר שלך>" \
+  --set-env-vars "GOOGLE_DRIVE_FOLDER_ID=<מזהה>,GOOGLE_DOCS_FOLDER_ID=<מזהה>,GOOGLE_SHEET_ID=<מזהה>" \
+  --set-secrets "YEMOT_TOKEN=yemot-token:latest" \
+  --set-secrets "WEBHOOK_SECRET=webhook-secret:latest" \
+  --set-secrets "GEMINI_API_KEY=gemini-key:latest"
+```
+
+`--allow-unauthenticated` נחוץ כדי שימות תוכל לפנות לשרת.
+ההגנה היא הסוד המשותף בכתובת, לא IAM.
+
+**`--service-account` אינו אופציונלי.** בלעדיו Cloud Run רץ עם חשבון
+ברירת המחדל של המחשוב, שאיתו לא שיתפת את תיקיות ה-Drive — והתסמין יהיה
+`404 File not found` על כל שמירה, בזמן שההרשאות *נראות* תקינות.
+
+### שתי אזהרות שחשוב להבין
+
+**הדיסק ב-Cloud Run זמני.** ההקלטות נשמרות מקומית כשלב ראשון, ותור
+העלאה מעביר אותן ל-Drive. אם המופע נמחק לפני שהתור התרוקן, הקובץ
+המקומי הולך לאיבוד. לכן חשוב שהתור ירוץ.
+
+**המופע נרדם.** תזכורת שהגיע זמנה בזמן שאין מופע פעיל לא תחייג לבד.
+הגדר Cloud Scheduler שמעיר את השרת:
+
+```bash
+gcloud scheduler jobs create http flush-mirrors \
+  --location me-west1 \
+  --schedule "* * * * *" \
+  --uri "https://<הדומיין>/tasks/flush-mirrors?secret=<WEBHOOK_SECRET>" \
+  --http-method POST
+```
+
+---
+
+## איתור תקלות
+
+הלוג הוא JSON בשורה אחת לאירוע, עם `callId` שנשמר לאורך כל השיחה.
+
+```bash
+# כל מה שקרה בשיחה אחת
+grep '"callId":"<CALL_ID>"' logs.txt | jq .
+
+# רק שגיאות
+grep '"event":"ERROR"' logs.txt | jq .
+```
+
+| תסמין | סיבה נפוצה |
+|---|---|
+| `403` על כל בקשה | הסוד ב-`api_link` לא תואם ל-`WEBHOOK_SECRET` |
+| `has invalid characters for yemot` | טקסט שעקף את `sanitizeForSpeech` — הוסף אותו שם |
+| `DownloadFile: ימות החזירה שגיאה במקום קובץ` | נתיב ההקלטה שגוי או שאין הרשאה לשלוחה |
+| `session token is invalid` | תקין ומטופל: הקוד מתחבר מחדש ומנסה שוב. ראה "שני סוגי טוקנים" |
+| `Login נדחה` | הסיסמה ב-`YEMOT_TOKEN` שגויה, או שהמערכת לא מחוברת לאזור האישי בימות |
+| `404 File not found` ב-Google | התיקייה או הגיליון לא שותפו עם ה-service account |
+| `ממתין להשלמת העלאת ההקלטה ל-Drive` | תקין: Docs מחכה לקישור. יסתדר בריקון הבא |
+| תזכורת לא מחייגת | `REMINDERS_OUTBOUND_ENABLED` כבוי — ראה STATUS.md |
+| `הנתיב מכיל תו שימות פוסלת` | שם הקלטה ישן עם מקף. הקלטות חדשות מקבלות שם בספרות בלבד |
+| תזכורת חוזרת ונשמעת שוב | לא הוקש 1. זו התנהגות מכוונת — ראה "חיוג אחד, ואז המתנה" |
+| המשתמש שומע "אין מענה משרת API" | השרת לא החזיר תשובה בזמן. בדוק חריגה בלוג |
+
+---
+
+## מה המערכת לא עושה
+
+בכוונה, לגרסה הראשונה:
+
+- אין ממשק web. הטלפון הוא הממשק (סעיף 31 באפיון).
+- אין חיפוש בפתקים ואין עריכת תזכורות בטלפון.
+- אין תזכורות חוזרות.
+- אין Make. השיחה החיה, התמלול והאישור בשליטת ה-Backend בלבד.
+- אין תמיכה במספר משתמשים. מספר אחד מורשה.

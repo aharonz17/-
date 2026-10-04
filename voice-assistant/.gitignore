@@ -1,0 +1,14 @@
+node_modules/
+.env
+*.local
+data/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+benchmark/recordings/*
+!benchmark/recordings/.gitkeep
+benchmark/results/
+credentials*.json
+service-account*.json
+*.log

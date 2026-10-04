@@ -1,0 +1,28 @@
+{
+  "name": "voice-assistant",
+  "version": "0.1.0",
+  "description": "עוזר קולי אישי בטלפון על גבי ימות המשיח",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "scripts": {
+    "start": "node src/main.js",
+    "dev": "node --watch src/main.js",
+    "test": "node --test tests/*.test.js",
+    "benchmark": "node bin/benchmark.js",
+    "check-config": "node bin/check-config.js"
+  },
+  "dependencies": {
+    "@google-cloud/speech": "^8.1.0",
+    "@google/genai": "^2.22.0",
+    "better-sqlite3": "^13.0.3",
+    "express": "^4.22.2",
+    "googleapis": "^181.0.0",
+    "luxon": "^3.7.2",
+    "yemot-router2": "^6.2.3",
+    "zod": "^4.6.5"
+  },
+  "license": "MIT",
+  "private": true
+}
