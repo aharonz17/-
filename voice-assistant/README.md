@@ -130,6 +130,23 @@ bin/
 
 ---
 
+## הקמה על שרת — הדרך המומלצת
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aharonz17/-/claude/eloquent-pascal-cc5uvt/voice-assistant/deploy/setup-vm.sh | sudo bash
+```
+
+על כל Ubuntu 22.04/24.04 עם IP ציבורי ופורטים 80/443 פתוחים — למשל ה-e2-micro
+החינמי של Google Cloud. הסקריפט מתקין, שואל על המפתחות, מגדיר שירות systemd
+ו-HTTPS אוטומטי (Caddy + sslip.io), ומדפיס את שתי השורות לימות. הרצה חוזרת
+מעדכנת את הקוד ומשאירה את ההגדרות והנתונים.
+
+**למה לא Cloud Run:** הדיסק שם נמחק בכל הפעלה מחדש, ומסד הנתונים של
+התזכורות יושב עליו. בנוסף המופע נרדם, ותזכורת לא תחייג לבד. שרת עם דיסק
+קבוע פותר את שתי הבעיות בלי Cloud Scheduler ובלי תלות ב-Drive.
+
+Drive, Sheets ו-Docs אופציונליים: בלעדיהם הכל נשמר ב-`data/` בשרת.
+
 ## התקנה
 
 ```bash

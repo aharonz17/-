@@ -10,6 +10,7 @@
  *   סעיף 30 (ביצועים): המשתמש לא צריך לחכות בטלפון בזמן שכותבים ל-Docs.
  *   השמירה מאושרת לו מיד, והכתיבות האלה קורות אחריה.
  */
+import { config } from '../config/index.js';
 import { logger } from '../logging/logger.js';
 import { EVENTS } from '../logging/events.js';
 import { MIRROR_TARGETS } from './archive.js';
@@ -36,7 +37,14 @@ export function createMirrors ({
             reminderId: reminder?.reminder_id || null
         };
 
-        for (const target of [MIRROR_TARGETS.SHEETS, MIRROR_TARGETS.DOCS]) {
+        // שכבות התצוגה אופציונליות: יעד שלא הוגדר לא נכנס לתור, אחרת הוא
+        // היה נכשל בכל ריקון לנצח. הרשומה עצמה כבר שמורה ב-SQLite.
+        const targets = [
+            config.google.sheetId && MIRROR_TARGETS.SHEETS,
+            config.google.docsFolderId && MIRROR_TARGETS.DOCS
+        ].filter(Boolean);
+
+        for (const target of targets) {
             const queued = repo.enqueueMirrorWrite({
                 target,
                 payload,
@@ -75,7 +83,7 @@ export function createMirrors ({
             // קישור ההקלטה נלקח מ-Drive. אם העלאת ה-Drive עדיין בתור,
             // הקישור יהיה ריק — ולכן משימת ה-Docs נשארת בתור וננסה שוב
             // אחרי שה-Drive הושלם, במקום לכתוב שורה בלי קישור.
-            if (!recording?.drive_link) {
+            if (config.google.driveFolderId && !recording?.drive_link) {
                 throw new Error('ממתין להשלמת העלאת ההקלטה ל-Drive');
             }
 
@@ -83,7 +91,7 @@ export function createMirrors ({
                 at: fromStorage(entry.created_at),
                 type: entry.type,
                 text: entry.text || entry.transcript || '',
-                recordingLink: recording.drive_link,
+                recordingLink: recording?.drive_link || '',
                 suffix: reminder
                     ? `(תזכורת ל-${fromStorage(reminder.due_at).toFormat('dd/MM HH:mm')})`
                     : ''
