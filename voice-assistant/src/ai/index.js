@@ -7,19 +7,34 @@
  *
  * הבדל שחשוב לשמור עליו: understand קיים רק במנוע שמבין כוונה,
  * transcribeOnly קיים בכולם. מנוע תמלול טהור לא יכול לשמש בשיחה חיה
- * בלי שכבת הבנה מעליו, וה-factory לא מסתיר את זה.
+ * בלי שכבת הבנה מעליו — ולכן elevenlabs+qwen עוטף אותו בשלב הבנה.
  */
 import { config } from '../config/index.js';
 import { createGeminiProvider } from './gemini.js';
 import { createGoogleSttProvider } from '../stt/google-stt.js';
 import { createGroqProvider } from '../stt/groq.js';
 import { createElevenLabsProvider } from '../stt/elevenlabs.js';
+import { createGroqTextUnderstanding } from './groq-text.js';
+import { createTwoStageProvider } from './two-stage.js';
+
+/**
+ * ElevenLabs שומע, Qwen על Groq מבין. הנבחר במדידה של 04/10/2026:
+ * 13/21 מול 6/21 ל-Whisper, ו-9/10 שעות נכונות מול 5/10.
+ */
+function createElevenLabsQwenProvider (options = {}) {
+    return createTwoStageProvider({
+        name: 'elevenlabs+qwen',
+        transcriber: createElevenLabsProvider(options.transcriber),
+        understander: createGroqTextUnderstanding(options.understander)
+    });
+}
 
 const FACTORIES = {
     gemini: createGeminiProvider,
     'google-stt': createGoogleSttProvider,
     groq: createGroqProvider,
-    elevenlabs: createElevenLabsProvider
+    elevenlabs: createElevenLabsProvider,
+    'elevenlabs+qwen': createElevenLabsQwenProvider
 };
 
 export function createProvider (name, options = {}) {
@@ -37,7 +52,7 @@ export function createActiveUnderstandingProvider () {
     if (typeof provider.understand !== 'function') {
         throw new Error(
             `ACTIVE_TRANSCRIBER="${config.activeTranscriber}" הוא מנוע תמלול בלבד ואינו מבין כוונה.\n` +
-            'לשיחה חיה נדרש מנוע שמחזיר בקריאה אחת תמלול, כוונה ותשובה — כרגע gemini בלבד.\n' +
+            'לשיחה חיה נדרש מנוע שמחזיר תמלול, כוונה ותשובה: gemini, או elevenlabs+qwen.\n' +
             'המנועים האחרים קיימים להשוואה ב-npm run benchmark.'
         );
     }

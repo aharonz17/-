@@ -112,7 +112,7 @@ function normalizePhone (phone) {
 const transcriber = optional('ACTIVE_TRANSCRIBER', 'gemini');
 // מנועים שמותר להגדיר כמנוע השיחה. מנוע מתמלל בלבד שמוגדר כאן
 // ייעצר בעלייה עם הסבר, ב-createActiveUnderstandingProvider.
-const LIVE_CAPABLE = ['gemini', 'google-stt', 'groq'];
+const LIVE_CAPABLE = ['gemini', 'elevenlabs+qwen', 'google-stt', 'groq'];
 if (!LIVE_CAPABLE.includes(transcriber)) {
     warnings.push(`ACTIVE_TRANSCRIBER="${transcriber}" אינו מוכר — נעשה שימוש ב-gemini`);
 }
@@ -141,7 +141,7 @@ export const config = Object.freeze({
         projectId: optional('GOOGLE_PROJECT_ID'),
         credentialsPath: optional('GOOGLE_APPLICATION_CREDENTIALS'),
         geminiApiKey: optional('GEMINI_API_KEY'),
-        geminiModel: optional('GEMINI_MODEL', 'gemini-2.5-flash'),
+        geminiModel: optional('GEMINI_MODEL', 'gemini-3.5-flash'),
         driveFolderId: optional('GOOGLE_DRIVE_FOLDER_ID'),
         sheetId: optional('GOOGLE_SHEET_ID'),
         docsFolderId: optional('GOOGLE_DOCS_FOLDER_ID')
@@ -151,15 +151,17 @@ export const config = Object.freeze({
     activeTranscriber: LIVE_CAPABLE.includes(transcriber) ? transcriber : 'gemini',
 
     /**
-     * מנועי תמלול נוספים, להשוואה ב-benchmark.
-     * ElevenLabs הוא ל-benchmark בלבד — המכסה החינמית שלו אינה כוללת
-     * רישיון מסחרי. ראה src/stt/elevenlabs.js
+     * מנועי תמלול, ושלב ההבנה של המסלול elevenlabs+qwen.
+     * ElevenLabs: המכסה החינמית מתאימה לשימוש אישי, לא מסחרי.
+     * ראה src/stt/elevenlabs.js
      */
     stt: Object.freeze({
         groqApiKey: optional('GROQ_API_KEY'),
         groqModel: optional('GROQ_MODEL', 'whisper-large-v3-turbo'),
+        // מודל השפה של שלב ההבנה במסלול elevenlabs+qwen
+        groqTextModel: optional('GROQ_TEXT_MODEL', 'qwen/qwen3.8-27b'),
         elevenLabsApiKey: optional('ELEVENLABS_API_KEY'),
-        elevenLabsModel: optional('ELEVENLABS_MODEL', 'scribe_v1')
+        elevenLabsModel: optional('ELEVENLABS_MODEL', 'scribe_v2')
     }),
 
     recording: Object.freeze({

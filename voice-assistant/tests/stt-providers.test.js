@@ -50,9 +50,9 @@ test('ההגדרה הפעילה חייבת להיות מנוע שמבין כוו
     assert.equal(typeof createActiveUnderstandingProvider().understand, 'function');
 });
 
-test('ElevenLabs מסומן במפורש כ-benchmark בלבד', () => {
+test('ElevenLabs מסומן במפורש כמכסה חינמית לא מסחרית', () => {
     // הרישיון החינמי אוסר שימוש מסחרי, והסימון הזה הוא התיעוד בקוד
-    assert.equal(createProvider('elevenlabs', { apiKey: 'k' }).benchmarkOnly, true);
+    assert.equal(createProvider('elevenlabs', { apiKey: 'k' }).freeTierNonCommercial, true);
 });
 
 // ---- Groq -----------------------------------------------------------------

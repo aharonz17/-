@@ -98,8 +98,17 @@ async function main () {
     else await check(`ElevenLabs (${config.stt.elevenLabsModel})`, async () => {
         const provider = createProvider('elevenlabs');
         await provider.transcribeOnly({ audio: silentWav(), mimeType: 'audio/wav', timeoutMs: 45000 });
-        return 'המנוע עונה — benchmark בלבד';
+        return 'המנוע עונה';
     });
+
+    if (config.stt.elevenLabsApiKey && config.stt.groqApiKey) {
+        await check(`elevenlabs+qwen — שלב ההבנה (${config.stt.groqTextModel})`, async () => {
+            const { createGroqTextUnderstanding } = await import('../src/ai/groq-text.js');
+            const { intent } = await createGroqTextUnderstanding()
+                .understandText({ transcript: 'תזכיר לי מחר בעשר בבוקר להתקשר ליוסי' });
+            return `הבין: ${intent.type}, ${intent.time ?? 'בלי שעה'}`;
+        });
+    }
 
     console.log('\nGoogle');
     if (!config.google.driveFolderId) skip('Drive', 'GOOGLE_DRIVE_FOLDER_ID חסר');

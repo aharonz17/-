@@ -1,16 +1,16 @@
 /**
  * מנוע תמלול ElevenLabs Scribe.
  *
- * ⚠ **ל-Benchmark בלבד.** המכסה החינמית של ElevenLabs אינה כוללת רישיון
- *   מסחרי, והיא בסדר גודל של כ-30 דקות בחודש. היא מספיקה בדיוק כדי להריץ
- *   30–50 הקלטות קצרות פעם אחת ולראות מספרים — לא לשימוש יומיומי.
+ * נמדד על 21 הקלטות טלפון אמיתיות של המשתמש (04/10/2026): 27% WER מול
+ * 50% ל-Whisper של Groq, ו-9 מתוך 10 שעות נכונות מול 5 מתוך 10. זה המנוע
+ * ששומע במסלול הפעיל elevenlabs+qwen (ראה src/ai/two-stage.js).
  *
- *   הגנה מבנית: הספק הזה לא מממש understand, ו-createActiveUnderstandingProvider
- *   דוחה מנוע כזה. כלומר אי אפשר להפעיל אותו בטעות בשיחה חיה.
+ * לבדו הוא מתמלל בלבד ולא מממש understand, ולכן לא ניתן להגדיר אותו ישירות
+ * כמנוע השיחה. createActiveUnderstandingProvider דוחה מנוע כזה.
  *
- * למה בכל זאת: ElevenLabs טוענת לתוצאות הטובות ביותר בעברית (3.1% WER
- * ב-FLEURS). **זו טענה של הספק עצמו**, על הקלטות אולפן נקיות — ואצלנו
- * האודיו הוא 8 קילוהרץ מקו טלפון. בשביל זה בדיוק נועדה המדידה.
+ * ⚠ רישיון: המכסה החינמית (10,000 קרדיטים בחודש, כ-330 לדקת אודיו — כלומר
+ *   כ-30 דקות, כ-600 הודעות של 3 שניות) מותרת לשימוש אישי בלבד, לא מסחרי.
+ *   לשימוש מסחרי נדרשת תוכנית Starter ומעלה.
  *
  * ה-endpoint אומת בתיעוד ElevenLabs:
  *   POST https://api.elevenlabs.io/v1/speech-to-text
@@ -33,8 +33,8 @@ export function createElevenLabsProvider ({
         name: `elevenlabs:${model}`,
         model,
 
-        /** ל-benchmark בלבד. ראה ההערה בראש הקובץ. */
-        benchmarkOnly: true,
+        /** המכסה החינמית לשימוש אישי בלבד. ראה ההערה בראש הקובץ. */
+        freeTierNonCommercial: true,
 
         async transcribeOnly ({ audio, mimeType = 'audio/wav', timeoutMs = 60000 }) {
             const startedAt = Date.now();
