@@ -71,6 +71,10 @@ export function createArchive () {
                 bytes: audio.length
             });
 
+            // בלי תיקיית Drive ההקלטה נשארת רק על הדיסק של השרת. זה תקין
+            // בשרת עם דיסק קבוע; ב-Cloud Run, שהדיסק שלו נמחק, Drive הכרחי.
+            if (!config.google.driveFolderId) return { localPath };
+
             const queued = repo.enqueueMirrorWrite({
                 target: MIRROR_TARGETS.DRIVE,
                 payload: { recordingId: recording.recording_id, localPath, fileName, year, month },

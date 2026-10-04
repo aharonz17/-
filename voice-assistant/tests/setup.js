@@ -9,6 +9,11 @@ process.env.YEMOT_TOKEN = '0771234567:testpass';
 process.env.AUTHORIZED_PHONE = '0501234567';
 process.env.GEMINI_API_KEY = 'test-key';
 process.env.TIMEZONE = 'Asia/Jerusalem';
+// שכבות התצוגה מוגדרות כברירת מחדל בבדיקות. המצב בלעדיהן נבדק
+// ב-storage-optional.test.js, דרך setup-no-google.js.
+process.env.GOOGLE_DRIVE_FOLDER_ID ??= 'test-drive-folder';
+process.env.GOOGLE_SHEET_ID ??= 'test-sheet';
+process.env.GOOGLE_DOCS_FOLDER_ID ??= 'test-docs-folder';
 process.env.DATABASE_PATH = `./data/test-${process.pid}-${Math.random().toString(36).slice(2)}.sqlite`;
 
 import { rmSync } from 'node:fs';
