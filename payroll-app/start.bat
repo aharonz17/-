@@ -1,17 +1,40 @@
 @echo off
-chcp 65001 >nul
 cd /d "%~dp0"
-if not exist node_modules (
-  echo מתקין רכיבים בפעם הראשונה...
-  call npm install || goto :err
+
+where node >nul 2>nul
+if errorlevel 1 (
+  echo Node.js is not installed. Install the LTS version from https://nodejs.org and run this file again.
+  pause
+  exit /b 1
 )
-if not exist .next\BUILD_ID (
-  echo בונה את המערכת...
-  call npm run build || goto :err
+node -e "const [a,b]=process.versions.node.split('.').map(Number);process.exit(a>22||(a===22&&b>=13)?0:1)"
+if errorlevel 1 (
+  echo Node.js 22.13 or newer is required. Install the LTS version from https://nodejs.org
+  pause
+  exit /b 1
 )
+
+if not exist "node_modules\.bin\next.cmd" (
+  echo Installing components - first run only, this can take a few minutes...
+  call npm install
+  if errorlevel 1 goto :err
+)
+if not exist ".next\BUILD_ID" (
+  echo Building the app - first run only...
+  call npm run build
+  if errorlevel 1 goto :err
+)
+
+echo.
+echo The app is running at http://localhost:3000
+echo Keep this window open while you work. Close it to stop the app.
+echo.
 start "" http://localhost:3000
 call npm start
 goto :eof
+
 :err
-echo ההתקנה נכשלה. ודאו ש-Node.js 20 ומעלה מותקן: https://nodejs.org
+echo.
+echo Setup failed. Send a screenshot of this window.
 pause
+exit /b 1
