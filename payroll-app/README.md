@@ -4,7 +4,7 @@
 
 ## הפעלה
 
-**דרישה:** [Node.js](https://nodejs.org) גרסה 20 ומעלה.
+**דרישה:** [Node.js](https://nodejs.org) גרסה 22.13 ומעלה (מומלץ LTS). מסד הנתונים מובנה ב-Node (`node:sqlite`), כך שאין רכיבים שצריך לקמפל.
 
 - **Windows:** לחיצה כפולה על `start.bat`
 - **Mac/Linux:** `./start.sh`
@@ -25,6 +25,10 @@
 ```
 npm run create-user -- admin NewPassword123
 ```
+
+### אם ההפעלה נכשלה
+- `'next' is not recognized`: ההתקנה הקודמת לא הסתיימה. מוחקים את התיקייה `node_modules` ומפעילים שוב את `start.bat`.
+- אחרי עדכון גרסה של המערכת: מוחקים את התיקייה `.next`, ו-`start.bat` יבנה מחדש.
 
 ### איפה הנתונים
 - המסד נשמר בקובץ `data/payroll.db`. כדאי לגבות אותו (מספיק להעתיק את הקובץ כשהמערכת סגורה).

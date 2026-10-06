@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import { DatabaseSync, type SQLInputValue, type StatementSync } from "node:sqlite";
 import fs from "node:fs";
 import path from "node:path";
 import { RULES } from "@/rules-data";
@@ -140,54 +140,97 @@ const MIGRATIONS: string[] = [
   `,
 ];
 
-let _db: Database.Database | null = null;
+/**
+ * עטיפה דקה סביב node:sqlite (מובנה ב-Node 22.13+), כדי שלא יידרש רכיב שצריך קומפילציה ב-Windows.
+ * מספקת את מה שהקוד צריך: prepare / exec / transaction / pragma.
+ */
+export class Db {
+  private depth = 0;
+  constructor(public raw: DatabaseSync) {}
+  prepare(sql: string) {
+    return new Stmt(this.raw.prepare(sql));
+  }
+  exec(sql: string) {
+    this.raw.exec(sql);
+  }
+  pragma(p: string, opts: { simple?: boolean } = {}) {
+    const rows = this.raw.prepare(`PRAGMA ${p}`).all() as Record<string, unknown>[];
+    return opts.simple ? (rows[0] ? Object.values(rows[0])[0] : undefined) : rows;
+  }
+  /** כמו better-sqlite3: מחזירה פונקציה שמריצה את fn בטרנזקציה (תומך בקינון עם SAVEPOINT) */
+  transaction<T>(fn: () => T): () => T {
+    return () => {
+      const sp = `sp${this.depth}`;
+      this.raw.exec(this.depth === 0 ? "BEGIN" : `SAVEPOINT ${sp}`);
+      this.depth++;
+      try {
+        const r = fn();
+        this.depth--;
+        this.raw.exec(this.depth === 0 ? "COMMIT" : `RELEASE ${sp}`);
+        return r;
+      } catch (e) {
+        this.depth--;
+        this.raw.exec(this.depth === 0 ? "ROLLBACK" : `ROLLBACK TO ${sp}; RELEASE ${sp}`);
+        throw e;
+      }
+    };
+  }
+}
+
+/** הצהרה מוכנה; הפרמטרים מועברים כמו שהם (מספרים, מחרוזות, null, Buffer) */
+class Stmt {
+  constructor(private s: StatementSync) {}
+  run(...args: unknown[]) {
+    return this.s.run(...(args as SQLInputValue[]));
+  }
+  get(...args: unknown[]): unknown {
+    return this.s.get(...(args as SQLInputValue[]));
+  }
+  all(...args: unknown[]): unknown[] {
+    return this.s.all(...(args as SQLInputValue[]));
+  }
+}
+
+let _db: Db | null = null;
 
 export function dbPath() {
   return process.env.DATABASE_PATH || path.join(process.cwd(), "data", "payroll.db");
 }
 
-export function getDb(): Database.Database {
+export function getDb(): Db {
   if (_db) return _db;
   const p = dbPath();
   if (p !== ":memory:") fs.mkdirSync(path.dirname(p), { recursive: true });
-  const db = new Database(p);
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
+  const db = new Db(new DatabaseSync(p));
+  db.exec("PRAGMA journal_mode = WAL");
+  db.exec("PRAGMA busy_timeout = 5000");
+  db.exec("PRAGMA foreign_keys = ON");
   migrate(db);
   seedRules(db);
   _db = db;
   return db;
 }
 
-/** לבדיקות: מסד בזיכרון */
-export function setDbForTests(db: Database.Database | null) {
-  if (db) { db.pragma("foreign_keys = ON"); migrate(db); seedRules(db); }
-  _db = db;
-}
-
-function migrate(db: Database.Database) {
-  const v = db.pragma("user_version", { simple: true }) as number;
+function migrate(db: Db) {
+  const v = Number(db.pragma("user_version", { simple: true }) ?? 0);
   for (let i = v; i < MIGRATIONS.length; i++) {
     db.transaction(() => {
       db.exec(MIGRATIONS[i]);
-      db.pragma(`user_version = ${i + 1}`);
+      db.exec(`PRAGMA user_version = ${i + 1}`);
     })();
   }
 }
 
 /** טעינת כללי ה-seed (לא דורס כללים שנוספו ידנית מהממשק) */
-function seedRules(db: Database.Database) {
+function seedRules(db: Db) {
   const upsert = db.prepare(`INSERT INTO rule_versions (id, key, version, effective_from, effective_to, payload_json, source_name, source_url, verified, notes, origin)
-    VALUES (@id, @key, @version, @from, @to, @payload, @sname, @surl, @verified, @notes, 'seed')
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'seed')
     ON CONFLICT(id) DO UPDATE SET effective_from=excluded.effective_from, effective_to=excluded.effective_to, payload_json=excluded.payload_json,
       source_name=excluded.source_name, source_url=excluded.source_url, verified=excluded.verified, notes=excluded.notes
     WHERE rule_versions.origin = 'seed'`);
   db.transaction(() => {
     for (const r of RULES) {
-      upsert.run({
-        id: ruleId(r), key: r.key, version: r.version, from: r.effectiveFrom, to: r.effectiveTo,
-        payload: JSON.stringify(r.payload), sname: r.source.name, surl: r.source.url ?? null, verified: r.verified ? 1 : 0, notes: r.notes ?? null,
-      });
+      upsert.run(ruleId(r), r.key, r.version, r.effectiveFrom, r.effectiveTo, JSON.stringify(r.payload), r.source.name, r.source.url ?? null, r.verified ? 1 : 0, r.notes ?? null);
     }
   })();
 }

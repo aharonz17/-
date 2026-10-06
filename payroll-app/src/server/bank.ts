@@ -117,8 +117,8 @@ export const getImport = (id: number) => db().prepare("SELECT * FROM bank_import
 export const listImports = (accountId: number) => db().prepare("SELECT id, account_id, file_name, file_type, rows_imported, status, created_at FROM bank_imports WHERE account_id = ? ORDER BY id DESC").all(accountId) as ImportRow[];
 
 export async function importGrid(importId: number) {
-  const imp = db().prepare("SELECT file_name, raw_blob FROM bank_imports WHERE id = ?").get(importId) as { file_name: string; raw_blob: Buffer };
-  return (await parseUploadedFile(imp.file_name, imp.raw_blob)).grid;
+  const imp = db().prepare("SELECT file_name, raw_blob FROM bank_imports WHERE id = ?").get(importId) as { file_name: string; raw_blob: Uint8Array };
+  return (await parseUploadedFile(imp.file_name, Buffer.from(imp.raw_blob))).grid;
 }
 
 export async function previewImport(importId: number, headerRow: number, mapping: Mapping, fmt: DateFormat) {
