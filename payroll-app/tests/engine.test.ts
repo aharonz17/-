@@ -169,3 +169,19 @@ describe("גמר חשבון", () => {
     expect(noticeDays("hourly", 40)).toBe(30);
   });
 });
+
+describe("שמות שורות", () => {
+  it("לכל שורה בתלוש יש תיאור (גם בלי שם קופה)", () => {
+    const r = calculatePayroll(baseInput(), rulesFor(2026, 6));
+    expect(r.lines.every((l) => typeof l.name === "string" && l.name.length > 0)).toBe(true);
+    expect(r.lines.find((l) => l.code === "110")?.name).toBe("קרן פנסיה – עובד");
+  });
+});
+
+describe("נקודות זיכוי ידניות", () => {
+  it("קביעה ידנית גוברת על החישוב", () => {
+    const r = calculatePayroll(baseInput({ taxFacts: { resident: true, creditPointsOverride: 4.75 } }), rulesFor(2026, 6));
+    expect(r.tax.creditPoints).toBe(4.75);
+    expect(r.tax.creditPointsAmount).toBe(1149.5);
+  });
+});

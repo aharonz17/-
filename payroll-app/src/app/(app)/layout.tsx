@@ -23,6 +23,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Link href="/employees">עובדים</Link>
           <Link href="/payroll">הרצות שכר</Link>
           <Link href="/payslips">תלושים</Link>
+          <Link href="/simulator">סימולטור (העלאת תלוש)</Link>
           <Link href="/payments">תשלומים</Link>
           <div className="label">בנק</div>
           <Link href="/bank">חשבונות בנק</Link>

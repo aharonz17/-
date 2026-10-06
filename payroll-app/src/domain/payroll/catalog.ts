@@ -62,6 +62,7 @@ export const EXTRA: Record<ExtraComponentType, ComponentDef> = {
   VACATION_REDEMPTION: def("056", "פדיון חופשה", "earning"),
   CLOTHING: def("057", "ביגוד", "earning"),
   ADJUSTMENT: def("058", "הפרשים / תיקון", "earning"),
+  ABSENCE_DEDUCTION: def("006", "ניכוי היעדרות", "earning", { pension: true }),
   OTHER_EARNING: def("059", "תשלום אחר", "earning"),
   MEAL_BENEFIT: def("044", "שווי ארוחות", "benefit"),
   GIFT_BENEFIT: def("045", "שווי מתנה", "benefit"),

@@ -61,7 +61,7 @@ export function calculatePayroll(input: PayrollInput, rules: RuleSet): PayrollRe
   const add = (def: ComponentDef, value: Decimal.Value, extra: Partial<PayslipLine> = {}) => {
     const v = round2(value);
     if (v.isZero() && !extra.quantity) return;
-    lines.push({ code: def.code, name: extra.name ?? def.name, category: def.category, amount: v.toNumber(), def, value: v, ...extra });
+    lines.push({ ...extra, code: def.code, name: extra.name ?? def.name, category: def.category, amount: v.toNumber(), def, value: v });
   };
 
   // ───── 2. ערך שעה / יום ─────

@@ -109,6 +109,7 @@ function readTax(fd: FormData): { year: number; facts: TaxFacts; settings: TaxPr
       newImmigrant: aliyah ? { aliyahDate: aliyah } : null,
       reserveCombatDaysPrevYear: num(fd, "reserve_days") ?? undefined,
       settlement: sRate ? { name: str(fd, "settlement_name") ?? undefined, rate: sRate, annualIncomeCap: num0(fd, "settlement_cap") } : null,
+      creditPointsOverride: num(fd, "points_override"),
       additionalPoints: num(fd, "additional_points") ?? undefined,
       additionalPointsNote: str(fd, "additional_note") ?? undefined,
     },
