@@ -21,6 +21,7 @@
     "iconv-lite": "^0.7.3",
     "next": "^16.3.8",
     "papaparse": "^5.7.0",
+    "pdfjs-dist": "^6.4.299",
     "playwright-core": "1.56",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",

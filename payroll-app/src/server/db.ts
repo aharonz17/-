@@ -138,6 +138,13 @@ const MIGRATIONS: string[] = [
   );
   CREATE INDEX idx_audit_entity ON audit_events(entity_type, entity_id);
   `,
+  `
+  CREATE TABLE payslip_imports (
+    id INTEGER PRIMARY KEY, file_name TEXT NOT NULL, file_hash TEXT NOT NULL, raw_blob BLOB NOT NULL,
+    lines_json TEXT NOT NULL, extracted_json TEXT NOT NULL, scenario_json TEXT,
+    employee_id INTEGER REFERENCES employees(id) ON DELETE SET NULL, created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  `,
 ];
 
 /**

@@ -20,6 +20,8 @@ export function computeCreditPoints(
   period: { year: number; month: number },
   rules: RuleSet,
 ): CreditPointLine[] {
+  if (facts.creditPointsOverride !== null && facts.creditPointsOverride !== undefined)
+    return [{ label: "נקודות זיכוי שנקבעו ידנית", points: facts.creditPointsOverride }];
   const lines: CreditPointLine[] = [];
   const personal = rules.get("credit_points.personal");
   const start = periodStart(period.year, period.month);

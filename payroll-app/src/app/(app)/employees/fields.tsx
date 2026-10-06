@@ -213,6 +213,7 @@ export function TaxFields({ t, year }: { t?: TaxProfile; year: number }) {
           <F label="יישוב מזכה – שם"><input name="settlement_name" defaultValue={f.settlement?.name ?? ""} /></F>
           <F label="יישוב מזכה – שיעור זיכוי (%)"><input name="settlement_rate" inputMode="decimal" defaultValue={pctIn(f.settlement?.rate)} /></F>
           <F label="יישוב מזכה – תקרת הכנסה שנתית (₪)"><input name="settlement_cap" inputMode="decimal" defaultValue={f.settlement?.annualIncomeCap ?? ""} /></F>
+          <F label="סך נקודות זיכוי – קביעה ידנית (גובר על החישוב)"><input name="points_override" inputMode="decimal" defaultValue={f.creditPointsOverride ?? ""} /></F>
           <F label="נקודות זיכוי נוספות (ידני)"><input name="additional_points" inputMode="decimal" defaultValue={f.additionalPoints ?? ""} /></F>
           <F label="סיבה לנקודות הנוספות"><input name="additional_note" defaultValue={f.additionalPointsNote ?? ""} /></F>
         </div>

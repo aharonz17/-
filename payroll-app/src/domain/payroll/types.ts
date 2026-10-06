@@ -17,6 +17,8 @@ export type TaxFacts = {
   reserveCombatDaysPrevYear?: number;
   /** יישוב מזכה: שיעור זיכוי ותקרת הכנסה שנתית */
   settlement?: { name?: string; rate: number; annualIncomeCap: number } | null;
+  /** קביעה ידנית של סך נקודות הזיכוי (למשל לפי תלוש קיים) – גוברת על החישוב מהעובדות */
+  creditPointsOverride?: number | null;
   /** נקודות ידניות נוספות (למשל תוספת 6–17, אישור פקיד שומה) */
   additionalPoints?: number;
   additionalPointsNote?: string;
@@ -75,7 +77,7 @@ export type Attendance = {
 
 export type ExtraComponentType =
   | "BONUS" | "COMMISSION" | "FIXED_SUPPLEMENT" | "GLOBAL_OVERTIME" | "RESERVE_PAY" | "NOTICE_PAY"
-  | "VACATION_REDEMPTION" | "CLOTHING" | "ADJUSTMENT" | "OTHER_EARNING"
+  | "VACATION_REDEMPTION" | "CLOTHING" | "ADJUSTMENT" | "ABSENCE_DEDUCTION" | "OTHER_EARNING"
   | "MEAL_BENEFIT" | "GIFT_BENEFIT" | "OTHER_BENEFIT"
   | "REIMBURSEMENT"
   | "LOAN" | "ADVANCE" | "UNION_FEE" | "GARNISHMENT" | "OTHER_DEDUCTION";
