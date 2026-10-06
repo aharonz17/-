@@ -4,13 +4,15 @@
   "private": true,
   "description": "מערכת שכר, תלושים ועו\"ש ישראלית",
   "scripts": {
-    "dev": "next dev -p 3000",
+    "dev": "next dev -p 3000 -H 127.0.0.1",
     "build": "next build",
-    "start": "next start -p 3000",
+    "start": "next start -p 3000 -H 127.0.0.1",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "seed": "tsx scripts/seed.ts",
-    "create-user": "tsx scripts/create-user.ts"
+    "create-user": "tsx scripts/create-user.ts",
+    "e2e": "node e2e/acceptance.mjs",
+    "setup": "npm install && npm run build"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -23,6 +25,7 @@
     "playwright-core": "1.56",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
+    "server-only": "^0.0.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -35,5 +38,8 @@
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^5.0.3"
+  },
+  "engines": {
+    "node": ">=20.10"
   }
 }

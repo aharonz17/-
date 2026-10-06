@@ -140,3 +140,32 @@ describe("מס – מצבים מיוחדים", () => {
     for (const s of ["ברוטו", "בסיסים", "מס הכנסה", "ביטוח לאומי", "פנסיה", "נטו", "עלות מעסיק", "יתרות"]) expect(sections.has(s)).toBe(true);
   });
 });
+
+import { calculateTermination, noticeDays } from "@/domain/payroll/termination";
+
+describe("גמר חשבון", () => {
+  const base = {
+    startDate: "2023-01-01", endDate: "2025-12-31", payType: "monthly" as const, lastMonthlySalary: 12000, jobPercent: 100, workWeekDays: 5 as const,
+    reason: "dismissal" as const, section14Full: false, severanceFundBalance: 20000, vacationBalanceDays: 5, unpaidRecoveryDays: 0, recoveryDayRate: 451.5, exemptPerYear: 13750,
+  };
+  it("3 שנים: פיצויים 36,000 והשלמה מעבר לקופה", () => {
+    const r = calculateTermination(base);
+    expect(r.seniorityMonths).toBe(36);
+    expect(r.severanceAmount).toBe(36000);
+    expect(r.severanceTopUp).toBe(16000);
+    expect(r.noticeDays).toBe(30);
+    expect(r.noticePayInLieu).toBe(12000);
+  });
+  it("סעיף 14 מלא – אין השלמה", () => {
+    expect(calculateTermination({ ...base, section14Full: true }).severanceTopUp).toBe(0);
+  });
+  it("התפטרות רגילה – אין פיצויים", () => {
+    expect(calculateTermination({ ...base, reason: "resignation" }).severanceEntitled).toBe(false);
+  });
+  it("הודעה מוקדמת לפי החוק", () => {
+    expect(noticeDays("monthly", 3)).toBe(3);
+    expect(noticeDays("monthly", 8)).toBe(11);
+    expect(noticeDays("hourly", 18)).toBe(17);
+    expect(noticeDays("hourly", 40)).toBe(30);
+  });
+});
