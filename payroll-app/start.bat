@@ -14,16 +14,8 @@ if errorlevel 1 (
   exit /b 1
 )
 
-if not exist "node_modules\.bin\next.cmd" (
-  echo Installing components - first run only, this can take a few minutes...
-  call npm install
-  if errorlevel 1 goto :err
-)
-if not exist ".next\BUILD_ID" (
-  echo Building the app - first run only...
-  call npm run build
-  if errorlevel 1 goto :err
-)
+call node scripts\prepare.mjs
+if errorlevel 1 goto :err
 
 echo.
 echo The app is running at http://localhost:3000
