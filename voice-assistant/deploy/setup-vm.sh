@@ -76,8 +76,17 @@ else
 fi
 
 cd "$APP_DIR"
-npm ci --omit=dev --no-audit --no-fund --loglevel=error
-ok "החבילות הותקנו"
+# npm ci מוחק את node_modules ובונה מחדש — על e2-micro זה לוקח דקות, ובזמן
+# הזה העוזר שרץ ברקע נשאר בלי החבילות שלו. מתקינים רק כשהרשימה השתנתה.
+STAMP="node_modules/.install-stamp"
+WANT="$(sha256sum package-lock.json | cut -d' ' -f1) $(node --version)"
+if [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$WANT" ]; then
+    ok "החבילות עדכניות"
+else
+    npm ci --omit=dev --no-audit --no-fund --loglevel=error
+    echo "$WANT" > "$STAMP"
+    ok "החבילות הותקנו"
+fi
 
 # ---------------------------------------------------------------------------
 say "3/6  הגדרות"
