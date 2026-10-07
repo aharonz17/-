@@ -129,7 +129,15 @@ export function createServer ({ handleCall, mirrors }) {
         }
     });
 
-    app.use((req, res) => res.status(404).send('not found'));
+    app.use((req, res) => {
+        // בלי זה, קישור עם טעות בנתיב נכשל בשקט ולא משאיר שום סימן בלוג.
+        // הנתיב נרשם בלי הסוד.
+        logger.warn('בקשה לנתיב לא קיים', {
+            method: req.method,
+            path: req.path.replace(/^\/yemot\/[^/]+/, '/yemot/<secret>')
+        });
+        res.status(404).send('not found');
+    });
 
     return app;
 }
