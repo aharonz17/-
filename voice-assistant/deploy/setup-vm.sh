@@ -103,6 +103,15 @@ else
         [ -n "$GROQ_API_KEY" ]       || { read -r -s -p "  מפתח Groq (מתחיל ב-gsk_): " GROQ_API_KEY </dev/tty; echo; }
     fi
 
+    # ערכים שהודבקו דרך Notepad מגיעים עם \r בסוף, ורווחים מסביב. בלינוקס \r
+    # נשאר חלק מהערך ושובר את הסיסמה ואת המפתחות בלי שום סימן נראה.
+    clean() { local v="${1//$'\r'/}"; v="${v#"${v%%[![:space:]]*}"}"; printf '%s' "${v%"${v##*[![:space:]]}"}"; }
+    YEMOT_NUMBER="$(clean "$YEMOT_NUMBER")"
+    YEMOT_PASSWORD="$(clean "$YEMOT_PASSWORD")"
+    AUTHORIZED_PHONE="$(clean "$AUTHORIZED_PHONE")"
+    ELEVENLABS_API_KEY="$(clean "$ELEVENLABS_API_KEY")"
+    GROQ_API_KEY="$(clean "$GROQ_API_KEY")"
+
     [ -n "$YEMOT_NUMBER" ] && [ -n "$YEMOT_PASSWORD" ] && [ -n "$AUTHORIZED_PHONE" ] \
         && [ -n "$ELEVENLABS_API_KEY" ] && [ -n "$GROQ_API_KEY" ] \
         || fail "אחד הערכים ריק. הרץ שוב."
