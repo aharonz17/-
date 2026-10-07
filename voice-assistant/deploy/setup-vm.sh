@@ -34,6 +34,15 @@ fail() { printf '\n\033[1;31m✗ %s\033[0m\n' "$*" >&2; exit 1; }
 
 # ---------------------------------------------------------------------------
 say "1/6  התקנת תוכנות"
+# ל-e2-micro יש 1GB זיכרון ובלי swap. התקנת חבילות לצד העוזר שרץ ממלאת
+# אותו, והמכונה נתקעת בלי שום הודעת שגיאה (07/10/2026: נתקעה אחרי "הקוד
+# עודכן" והפסיקה לענות גם ב-HTTPS). 2GB swap על הדיסק מונעים את זה.
+if ! swapon --show | grep -q /swapfile; then
+    [ -f /swapfile ] || { fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile >/dev/null; }
+    swapon /swapfile
+    grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+ok "swap: $(swapon --show --noheadings --bytes | awk '{s+=$3} END {print int(s/1048576)}')MB"
 export DEBIAN_FRONTEND=noninteractive
 # שרת חדש מריץ עדכונים אוטומטיים בדקות הראשונות ונועל את apt. מחכים במקום להיכשל.
 apt_get() { apt-get -o DPkg::Lock::Timeout=600 "$@"; }
@@ -83,6 +92,8 @@ WANT="$(sha256sum package-lock.json | cut -d' ' -f1) $(node --version)"
 if [ -f "$STAMP" ] && [ "$(cat "$STAMP")" = "$WANT" ]; then
     ok "החבילות עדכניות"
 else
+    # העוזר הישן לא צריך לרוץ על חבילות שנמחקות מתחתיו, וזה גם מפנה זיכרון
+    systemctl stop voice-assistant 2>/dev/null || true
     npm ci --omit=dev --no-audit --no-fund --loglevel=error
     echo "$WANT" > "$STAMP"
     ok "החבילות הותקנו"
