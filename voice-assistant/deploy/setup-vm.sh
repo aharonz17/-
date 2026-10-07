@@ -171,10 +171,12 @@ Environment=TZ=Asia/Jerusalem
 WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
-systemctl enable --now voice-assistant >/dev/null 2>&1
+systemctl enable voice-assistant >/dev/null 2>&1
 systemctl restart voice-assistant
 
-for _ in $(seq 1 20); do
+# על e2-micro ההפעלה הראשונה לוקחת כחצי דקה (טעינת המודולים מדיסק איטי).
+# מחכים עד שתי דקות, לא 20 שניות.
+for _ in $(seq 1 120); do
     curl -fs "http://127.0.0.1:$PORT/health" >/dev/null && break
     sleep 1
 done
