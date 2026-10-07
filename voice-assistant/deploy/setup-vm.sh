@@ -79,12 +79,29 @@ say "3/6  הגדרות"
 if [ -f "$APP_DIR/.env" ]; then
     ok "קובץ ההגדרות כבר קיים — לא נוגעים בו (למחיקה: sudo rm $APP_DIR/.env והרצה חוזרת)"
 else
-    echo "  ההקלדה של המפתחות לא מוצגת על המסך. הדבק ולחץ Enter."
-    read -r -p "  מספר מערכת ימות (למשל 0796077939): " YEMOT_NUMBER </dev/tty
-    read -r -s -p "  סיסמת הניהול של ימות: " YEMOT_PASSWORD </dev/tty; echo
-    read -r -p "  הטלפון שלך, היחיד שמורשה להתקשר (למשל 0583264054): " AUTHORIZED_PHONE </dev/tty
-    read -r -s -p "  מפתח ElevenLabs (מתחיל ב-sk_): " ELEVENLABS_API_KEY </dev/tty; echo
-    read -r -s -p "  מפתח Groq (מתחיל ב-gsk_): " GROQ_API_KEY </dev/tty; echo
+    # הערכים יכולים להגיע מראש, כדי שההתקנה תרוץ בלי מסך:
+    #   1. ממשתני סביבה באותם שמות
+    #   2. מה-metadata של שרת Google Cloud (setup-<שם>), כשהשרת נוצר עם
+    #      startup-script ואין מי שיקליד. ראה deploy/create-gce.sh
+    meta() {
+        curl -fs -H 'Metadata-Flavor: Google' \
+            "http://metadata.google.internal/computeMetadata/v1/instance/attributes/setup-$1" 2>/dev/null || true
+    }
+    : "${YEMOT_NUMBER:=$(meta yemot-number)}"
+    : "${YEMOT_PASSWORD:=$(meta yemot-password)}"
+    : "${AUTHORIZED_PHONE:=$(meta authorized-phone)}"
+    : "${ELEVENLABS_API_KEY:=$(meta elevenlabs-key)}"
+    : "${GROQ_API_KEY:=$(meta groq-key)}"
+
+    if [ -z "$YEMOT_NUMBER" ] || [ -z "$YEMOT_PASSWORD" ] || [ -z "$AUTHORIZED_PHONE" ] \
+        || [ -z "$ELEVENLABS_API_KEY" ] || [ -z "$GROQ_API_KEY" ]; then
+        echo "  ההקלדה של המפתחות לא מוצגת על המסך. הדבק ולחץ Enter."
+        [ -n "$YEMOT_NUMBER" ]       || read -r -p "  מספר מערכת ימות (למשל 0796077939): " YEMOT_NUMBER </dev/tty
+        [ -n "$YEMOT_PASSWORD" ]     || { read -r -s -p "  סיסמת הניהול של ימות: " YEMOT_PASSWORD </dev/tty; echo; }
+        [ -n "$AUTHORIZED_PHONE" ]   || read -r -p "  הטלפון שלך, היחיד שמורשה להתקשר (למשל 0583264054): " AUTHORIZED_PHONE </dev/tty
+        [ -n "$ELEVENLABS_API_KEY" ] || { read -r -s -p "  מפתח ElevenLabs (מתחיל ב-sk_): " ELEVENLABS_API_KEY </dev/tty; echo; }
+        [ -n "$GROQ_API_KEY" ]       || { read -r -s -p "  מפתח Groq (מתחיל ב-gsk_): " GROQ_API_KEY </dev/tty; echo; }
+    fi
 
     [ -n "$YEMOT_NUMBER" ] && [ -n "$YEMOT_PASSWORD" ] && [ -n "$AUTHORIZED_PHONE" ] \
         && [ -n "$ELEVENLABS_API_KEY" ] && [ -n "$GROQ_API_KEY" ] \
