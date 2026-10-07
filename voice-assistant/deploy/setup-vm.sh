@@ -220,7 +220,7 @@ cat <<EOF
   הכל מוכן. העתק את שתי השורות האלה לקובץ ext.ini של השלוחה בימות:
 
 type=api
-api_link=https://$DOMAIN/yemot?secret=$SECRET
+api_link=https://$DOMAIN/yemot/$SECRET
 
   לצפייה במה שקורה בזמן אמת:
     sudo journalctl -u voice-assistant -f

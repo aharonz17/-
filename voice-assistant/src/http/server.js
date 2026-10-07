@@ -4,7 +4,7 @@
  * הגנה בשתי שכבות, כי אף אחת מהן לא מספיקה לבדה:
  *
  *   1. סוד משותף ב-URL. כתובת ה-webhook היא ציבורית מעצם טבעה, וכל מי
- *      שמגלה אותה יכול לזייף שיחה. ימות מצרפת את הסוד כפרמטר, והבקשה
+ *      שמגלה אותה יכול לזייף שיחה. הסוד הוא חלק מהנתיב (/yemot/<סוד>), והבקשה
  *      נדחית בלעדיו — לפני שהיא מגיעה לקוד השיחה בכלל.
  *
  *   2. בדיקת מספר מורשה בצד השרת (דרישה 16), שקורית בתוך זרימת השיחה.
@@ -21,9 +21,34 @@ import { sayAll } from '../domain/speech.js';
 /** השוואה בזמן קבוע, כדי לא לדלוף את הסוד דרך זמני תגובה. */
 function secretMatches (provided) {
     const expected = config.webhookSecret;
-    if (!provided || provided.length !== expected.length) return false;
+    if (typeof provided !== 'string' || provided.length !== expected.length) return false;
 
     return timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+}
+
+/**
+ * הסוד מגיע בנתיב: /yemot/<סוד>. זו הצורה המומלצת, כי ימות מוסיפה פרמטרים
+ * משלה לכתובת, ופרמטר שלנו ב-query לא שרד את זה בשיחה אמיתית (07/10/2026:
+ * הבקשות הגיעו לשרת ונדחו על סוד, עם קישור שהסוד בו שלם). בנתיב אין לה
+ * מה לגעת. הצורה הישנה, ?secret=, עדיין נתמכת.
+ */
+function providedSecret (req) {
+    if (req.params?.secret) return req.params.secret;
+    const fromQuery = req.query.secret ?? req.body?.secret;
+    return Array.isArray(fromQuery) ? fromQuery[0] : fromQuery;
+}
+
+/** מה הגיע, בלי לחשוף את הסוד עצמו — כדי שדחייה תהיה ניתנת לאבחון מהלוג. */
+function describeRejected (req, provided) {
+    const raw = req.query.secret ?? req.body?.secret;
+    return {
+        method: req.method,
+        hasSecret: Boolean(provided),
+        secretLength: typeof provided === 'string' ? provided.length : null,
+        expectedLength: config.webhookSecret.length,
+        secretIsArray: Array.isArray(raw),
+        params: Object.keys(req.query).concat(Object.keys(req.body || {})).join(',')
+    };
 }
 
 export function createServer ({ handleCall, mirrors }) {
@@ -37,19 +62,16 @@ export function createServer ({ handleCall, mirrors }) {
         res.json({ status: 'ok', timezone: config.timezone, engine: config.activeTranscriber });
     });
 
-    app.use('/yemot', (req, res, next) => {
-        const provided = req.query.secret || req.body?.secret;
+    function requireSecret (req, res, next) {
+        const provided = providedSecret(req);
 
         if (!secretMatches(provided)) {
-            logger.warn('בקשה ל-webhook בלי סוד תקין', {
-                ip: req.ip,
-                hasSecret: Boolean(provided)
-            });
+            logger.warn('בקשה ל-webhook בלי סוד תקין', describeRejected(req, provided));
             res.status(403).send('forbidden');
             return;
         }
         next();
-    });
+    }
 
     const router = YemotRouter({
         timeout: 10 * 60 * 1000,
@@ -84,14 +106,16 @@ export function createServer ({ handleCall, mirrors }) {
         logger.child({ callId: call.callId }).event(EVENTS.CALL_ENDED, { outcome: 'hangup' });
     });
 
-    app.use('/yemot', router.asExpressRouter);
+    // הסדר חשוב: הנתיב עם הסוד קודם, אחרת /yemot/<סוד> ייתפס כ-/yemot בלי סוד
+    app.use('/yemot/:secret', requireSecret, router.asExpressRouter);
+    app.use('/yemot', requireSecret, router.asExpressRouter);
 
     /**
      * ריקון תור התצוגה בדחיפה חיצונית (Cloud Scheduler / cron).
      * מוגן באותו סוד.
      */
     app.post('/tasks/flush-mirrors', async (req, res) => {
-        if (!secretMatches(req.query.secret || req.body?.secret)) {
+        if (!secretMatches(providedSecret(req))) {
             res.status(403).send('forbidden');
             return;
         }

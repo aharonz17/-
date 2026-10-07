@@ -236,7 +236,7 @@ gcloud iam service-accounts keys create service-account.json \
 
 ```ini
 type=api
-api_link=https://<הדומיין-שלך>/yemot?secret=<WEBHOOK_SECRET>
+api_link=https://<הדומיין-שלך>/yemot/<WEBHOOK_SECRET>
 ```
 
 ודא שהנתיב ב-`YEMOT_RECORDINGS_PATH` קיים במערכת ושיש לו הרשאת כתיבה.
