@@ -61,9 +61,14 @@ ok "Caddy $(caddy version | cut -d' ' -f1)"
 say "2/6  הורדת הקוד"
 id "$SERVICE_USER" >/dev/null 2>&1 || useradd --system --home "$INSTALL_DIR" --shell /usr/sbin/nologin "$SERVICE_USER"
 
+# בהרצה חוזרת התיקייה כבר שייכת למשתמש השירות, ו-git מסרב לעבוד בה כ-root
+# ("dubious ownership"). מסמנים אותה כבטוחה בכל פקודה, ולא ב-config גלובלי,
+# כי ב-startup-script אין HOME.
+repo_git() { git -c safe.directory="$INSTALL_DIR" -C "$INSTALL_DIR" "$@"; }
+
 if [ -d "$INSTALL_DIR/.git" ]; then
-    git -C "$INSTALL_DIR" fetch -q origin "$BRANCH"
-    git -C "$INSTALL_DIR" checkout -q -B "$BRANCH" "origin/$BRANCH"
+    repo_git fetch -q origin "$BRANCH"
+    repo_git checkout -q -f -B "$BRANCH" "origin/$BRANCH"
     ok "הקוד עודכן"
 else
     git clone -q --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
