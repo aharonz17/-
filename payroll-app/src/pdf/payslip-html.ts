@@ -19,7 +19,7 @@ export type PayslipTemplate = {
   codes: Record<string, { code?: string; name?: string }>;
 };
 
-export const DEFAULT_TEMPLATE: PayslipTemplate = { layout: "classic", color: "var(--c)", showYtd: true, codes: {} };
+export const DEFAULT_TEMPLATE: PayslipTemplate = { layout: "classic", color: "#1f3b6b", showYtd: true, codes: {} };
 
 const safeColor = (c: string | undefined) => (c && /^#[0-9a-fA-F]{6}$/.test(c) ? c : DEFAULT_TEMPLATE.color);
 
@@ -41,6 +41,7 @@ export function renderPayslipHtml(
 ) {
   const tpl: PayslipTemplate = { ...DEFAULT_TEMPLATE, ...(opts.template ?? {}), codes: opts.template?.codes ?? {} };
   const color = safeColor(tpl.color);
+  const layout = (["classic", "stacked", "compact"] as const).includes(tpl.layout) ? tpl.layout : "classic";
   const r = s.result, e = s.employee, er = s.employer, em = s.employment, a = s.input.attendance;
   const relabel = (l: PayslipLine): PayslipLine => {
     const o = tpl.codes[l.code];
@@ -97,7 +98,7 @@ export function renderPayslipHtml(
   .layout-compact .sum div span { font-size: 10pt; }
   .layout-compact .kv { grid-template-columns: max-content 1fr max-content 1fr max-content 1fr; }
   @media print { .noprint { display: none; } }
-</style></head><body class="layout-${tpl.layout}"><div class="page">${voidMark}
+</style></head><body class="layout-${layout}"><div class="page">${voidMark}
 <div class="head">
   <div class="who">
     ${logo ? `<img class="logo" src="${logo}" alt="">` : ""}
