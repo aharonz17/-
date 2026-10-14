@@ -19,7 +19,6 @@ export default async function EmployerPage({ params, searchParams }: { params: P
       <PageHead title={e.name} sub={`ח.פ ${e.company_id ?? "—"} · תיק ניכויים ${e.deductions_file ?? "—"}`}>
         <Link className="btn" href={`/employees/new?employer=${e.id}`}>+ עובד</Link>
         <Link className="btn secondary" href={`/payroll/new?employer=${e.id}`}>הרצת שכר</Link>
-        <Link className="btn secondary" href={`/employers/${e.id}/template`}>עיצוב תלוש</Link>
       </PageHead>
       <Flash sp={sp} />
       <div className="grid grid-2">

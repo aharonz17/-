@@ -29,7 +29,6 @@ export default async function AccountPage({ params, searchParams }: { params: Pr
       {sim && <div className="sim-banner">חשבון הדמיה – הנתונים אינם נתוני בנק אמיתיים ואינם מסמך רשמי של בנק.</div>}
       <PageHead title={acc.holder} sub={<>{acc.bank_code} – {acc.bank_name} · סניף {acc.branch ?? "—"} · חשבון <span className="ltr">{maskAccount(acc.account_number)}</span></>}>
         {!sim && <Link className="btn" href={`/bank/${acc.id}/import`}>ייבוא קובץ מהבנק</Link>}
-        <a className="btn secondary" href={`/api/bank/${acc.id}/statement?from=${from ?? ""}&to=${to ?? ""}`} target="_blank" rel="noreferrer">דוח פנימי PDF</a>
       </PageHead>
       <Flash sp={sp} />
 

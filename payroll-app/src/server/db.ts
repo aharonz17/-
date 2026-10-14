@@ -145,13 +145,6 @@ const MIGRATIONS: string[] = [
     employee_id INTEGER REFERENCES employees(id) ON DELETE SET NULL, created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
   `,
-  `
-  CREATE TABLE payslip_templates (
-    employer_id INTEGER PRIMARY KEY REFERENCES employers(id) ON DELETE CASCADE,
-    template_json TEXT NOT NULL DEFAULT '{}', logo_blob BLOB, logo_mime TEXT,
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-  );
-  `,
 ];
 
 /**
